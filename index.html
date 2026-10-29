@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-Hant-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noimageindex">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>快打袁枝</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="pill" id="hud-score">0 分</div>
+  <div class="pill" id="hud-catch">○○○</div>
+  <div class="pill" id="hud-time">0.0 秒</div>
+  <button class="pill icon" id="btn-mute" aria-label="靜音">🔊</button>
+</div>
+
+<!-- 小遊戲：完成 -->
+<button id="btn-done" class="hidden">✅ 完成</button>
+
+<!-- 載入中 -->
+<div id="scr-loading" class="screen">
+  <div class="card">
+    <div class="title">快打袁枝</div>
+    <div class="sub" id="load-text">載入緊…</div>
+  </div>
+</div>
+
+<!-- 開始畫面 -->
+<div id="scr-start" class="screen hidden">
+  <div class="card">
+    <div class="logo">
+      <img src="assets/ui/logo.png" alt="">
+      <span>快打袁枝</span>
+    </div>
+    <canvas id="avatar" width="220" height="220"></canvas>
+    <ul class="rules">
+      <li>袁枝喺公園周圍行，<b>㩒中佢</b>就捉到！</li>
+      <li>行緊 +150・花叢探頭 +200・坐低／捉棋 +80</li>
+      <li>打錯拖狗姐姐或者捉棋伯伯 −50</li>
+      <li>㩒隻臘腸狗，佢會追住袁枝跑！</li>
+      <li>捉夠 3 次，就有懲罰時間 💥</li>
+    </ul>
+    <button class="big" id="btn-start">開始</button>
+    <div class="sub" id="best-text"></div>
+  </div>
+</div>
+
+<!-- 小遊戲開始前 -->
+<div id="scr-punish" class="screen hidden">
+  <div class="card">
+    <div class="title">懲罰時間！</div>
+    <div class="sub">狂㩒袁枝！唔限時，打夠就㩒「完成」<br>打得越多，武器越勁 💪</div>
+    <div class="weapons">
+      <div><img src="assets/weapons/bat.png" alt=""><span>棒球棍</span></div>
+      <div><img src="assets/weapons/mace.png" alt=""><span>20 下<br>狼牙棒</span></div>
+      <div><img src="assets/weapons/flamethrower.png" alt=""><span>40 下<br>火槍</span></div>
+      <div><img src="assets/weapons/machine_gun.png" alt=""><span>60 下<br>機關槍</span></div>
+    </div>
+    <button class="big" id="btn-punish">開打！</button>
+    <button class="ghost hidden" id="btn-shake">📳 用搖手機打</button>
+    <div class="sub small" id="shake-text"></div>
+  </div>
+</div>
+
+<!-- 結算 -->
+<div id="scr-result" class="screen hidden">
+  <div class="card">
+    <div class="title" id="res-title">打完收工！</div>
+    <table class="score">
+      <tr><td>捉人分</td><td id="res-main">0</td></tr>
+      <tr><td id="res-time-label">用時加分</td><td id="res-time">0</td></tr>
+      <tr><td id="res-mini-label">懲罰分</td><td id="res-mini">0</td></tr>
+      <tr class="total"><td>總分</td><td id="res-total">0</td></tr>
+    </table>
+    <div class="sub" id="res-best"></div>
+    <button class="big" id="btn-copy">📋 複製成績</button>
+    <button class="ghost" id="btn-again">再玩一次</button>
+    <div class="sub small" id="copy-text"></div>
+  </div>
+</div>
+
+<!-- 暫停 -->
+<div id="scr-pause" class="screen hidden">
+  <div class="card">
+    <div class="title">暫停咗</div>
+    <button class="big" id="btn-resume">繼續</button>
+  </div>
+</div>
+
+<script src="game.js?v=1"></script>
+</body>
+</html>

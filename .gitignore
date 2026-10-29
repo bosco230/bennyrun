@@ -1,0 +1,15 @@
+# 唔上載：原圖、備份、本機工具
+backup/
+assets/_source/
+assets/**/hf_*.png
+*.textClipping
+.claude/
+
+# 根目錄嘅原始錄音（遊戲用 assets/audio/voice/ 嗰份）
+/*.m4a
+
+# 系統檔
+.DS_Store
+Thumbs.db
+desktop.ini
+Icon?
