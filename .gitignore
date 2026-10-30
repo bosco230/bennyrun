@@ -13,3 +13,17 @@ assets/**/hf_*.png
 Thumbs.db
 desktop.ini
 Icon?
+
+# 錄影工具同輸出（只喺本機用）
+rec.html
+tools/
+recordings/
+
+# IFC 天台原始素材（遊戲用 assets/ifc/ 嗰份）
+IFC Roof/
+
+# 燒碳原始素材（遊戲用 assets/burn/ 嗰份）
+burn carbon/
+
+# 唔係遊戲用嘅大檔案
+Run Benny Run introduction video.mp4

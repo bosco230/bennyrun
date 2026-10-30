@@ -45,6 +45,52 @@ html, body {
 }
 #btn-done:active { transform: translate(-50%, 3px); box-shadow: 0 2px 0 #3f9a62; }
 
+/* IFC 天台 */
+#btn-ifc {
+  position: fixed; left: max(12px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 50px);
+  z-index: 6; border: 0; cursor: pointer; font-family: inherit;
+  background: #4f7fd9; color: #fff; font-size: 17px; font-weight: 900;
+  padding: 9px 16px; border-radius: 999px; box-shadow: 0 4px 0 #34589f;
+}
+#btn-ifc:active { transform: translateY(3px); box-shadow: 0 1px 0 #34589f; }
+#btn-burn {
+  position: fixed; left: max(12px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 102px);
+  z-index: 6; border: 0; cursor: pointer; font-family: inherit;
+  background: #e0763a; color: #fff; font-size: 17px; font-weight: 900;
+  padding: 9px 16px; border-radius: 999px; box-shadow: 0 4px 0 #a9522a;
+}
+#btn-burn:active { transform: translateY(3px); box-shadow: 0 1px 0 #a9522a; }
+
+#ifc-video-layer {
+  position: fixed; inset: 0; z-index: 8; background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+#ifc-video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+#ifc-video-msg {
+  position: absolute; left: 16px; right: 16px; top: 50%; transform: translateY(-50%);
+  text-align: center; color: #fff; font-size: 18px; font-weight: 800; line-height: 1.5;
+}
+#btn-skip {
+  position: absolute; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top));
+  border: 2px solid rgba(255,255,255,.8); background: rgba(0,0,0,.45); color: #fff; cursor: pointer;
+  font-family: inherit; font-size: 17px; font-weight: 800; padding: 8px 16px; border-radius: 999px;
+}
+
+#ifc-hud {
+  position: fixed; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; justify-content: center; align-items: center; gap: 12px; padding: 0 16px;
+}
+#btn-push {
+  border: 0; cursor: pointer; font-family: inherit; font-weight: 900; font-size: 26px;
+  background: var(--pink); color: #fff; padding: 16px 34px; border-radius: 999px; box-shadow: 0 6px 0 var(--pink-dark);
+  touch-action: manipulation;
+}
+#btn-push:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--pink-dark); }
+#btn-spare {
+  border: 3px solid var(--blue); background: rgba(255,255,255,.92); color: var(--ink); cursor: pointer;
+  font-family: inherit; font-size: 16px; font-weight: 800; padding: 10px 16px; border-radius: 999px;
+}
+
 /* Screens */
 .screen {
   position: fixed; inset: 0; z-index: 10;

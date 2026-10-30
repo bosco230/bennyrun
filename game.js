@@ -55,14 +55,69 @@ const IMG_SRC = {
   fx_pa: 'assets/effects/fx_pa.png',
   benny: 'Benny.jpg',
   benny_idle: encodeURI('punch/Benny original.png'),
-  benny_hit: encodeURI('punch/Benny punch 1.png'),
+  benny_hit1: encodeURI('punch/Benny punch 1.png'),
+  benny_hit2: encodeURI('punch/Benny punch 2.png'),
+  benny_hit3: encodeURI('punch/Benny punch 3.png'),
+  benny_hit4: encodeURI('punch/Benny punch final.png'),
+  ifc_bg: 'assets/ifc/rooftop2.jpg',
+  ifc_benny: 'assets/ifc/benny_walking.png',
+  burn_room: 'assets/burn/room.jpg',
+  burn_sit: 'assets/burn/sit.png',
+  burn_scream1: 'assets/burn/scream1.png',
+  burn_scream2: 'assets/burn/scream2.png',
+  burn_scream3: 'assets/burn/scream3.png',
+  burn_furnace_on: 'assets/burn/furnace_on.png',
+  burn_furnace_off: 'assets/burn/furnace_off.png',
+  burn_window_closed: 'assets/burn/window_closed.png',
+  burn_window_open: 'assets/burn/window_open.png',
 };
 
-// 懲罰相入面頭頂同塊面嘅位置（以相片闊高比例計）
-const PUNCH = {
-  benny_idle: { top: { x: 0.50, y: 0.04 }, face: { x: 0.50, y: 0.22 } },
-  benny_hit:  { top: { x: 0.32, y: 0.03 }, face: { x: 0.34, y: 0.25 } },
+// 燒碳（救人版）：碳爐燒緊、窗閂住，Benny 越嚟越辛苦；玩家要開窗同熄碳爐救佢
+// 位置用房間相（1536×1024）嘅比例座標；y 係底部（腳）
+const BURN = {
+  stages: [0, 2.5, 6, 10],             // 辛苦程度轉階段嘅秒數（只喺有危險時計）
+  rescueScore: 600, perSec: 30, minScore: 100,
+  window: { x: 0.16, y: 0.55, h: 0.30 },
+  furnace: { x: 0.47, y: 0.93, h: 0.20 },
+  sofa: { x: 0.79, y: 0.90, h: 0.46 },  // 坐喺梳化
+  floor: { x: 0.74, y: 0.97, h: 0.50 }, // 辛苦到跪喺梳化前面
 };
+const BURN_VOICES = [
+  { src: 'assets/burn/burn_v1.m4a', text: '快啲開窗，好辛苦呀！' },
+  { src: 'assets/burn/burn_v2.m4a', text: '我唞唔到氣，我就死啦！' },
+  { src: 'assets/burn/burn_v3.m4a', text: '老友，俾條生路嚟行得唔得？' },
+  { src: 'assets/burn/burn_v4.m4a', text: '冇喇冇啦，啲鋪我死梗啦！' },
+  { src: 'assets/burn/burn_v5.m4a', text: '舒服晒！' },
+];
+const BURN_RELIEF = 4;
+
+// IFC 天台：天台分 9 格，主角每秒自動向右一格；推一下向左一格，喺最左再推就跌落去
+const IFC = {
+  cells: 9,
+  stepSec: 1,
+  fallScore: 500, perSec: 10, minScore: 100,
+  intro: 'assets/ifc/intro.mp4',
+  ending: 'assets/ifc/ending.mp4',
+  nearEdge: 2,          // 第 0–2 格算近邊緣
+};
+const IFC_VOICES = [
+  { src: 'assets/ifc/ifc_v1.m4a', text: '唔好推我啦，呢度好高呀！' },
+  { src: 'assets/ifc/ifc_v2.m4a', text: '唔好再推我啦，我真係好驚呀！' },
+  { src: 'assets/ifc/ifc_v3.m4a', text: '我唔想死住呀！' },
+  { src: 'assets/ifc/ifc_v4.m4a', text: '好在好在，嚇死我咩？' },
+  { src: 'assets/ifc/ifc_v5.m4a', text: '黃輝救我呀！' },
+];
+const IFC_NEAR = [0, 1, 2], IFC_RELIEF = 3, IFC_FALL = 4;
+
+// 懲罰相入面頭頂同塊面嘅位置（以相片闊高比例計）；tilt 係個頭嘅傾斜角度
+const PUNCH = {
+  benny_idle: { top: { x: 0.50, y: 0.04 }, face: { x: 0.50, y: 0.22 }, tilt: 0 },
+  benny_hit1: { top: { x: 0.32, y: 0.03 }, face: { x: 0.34, y: 0.25 }, tilt: -0.25 },
+  benny_hit2: { top: { x: 0.69, y: 0.03 }, face: { x: 0.67, y: 0.24 }, tilt: 0.25 },
+  benny_hit3: { top: { x: 0.50, y: 0.03 }, face: { x: 0.51, y: 0.21 }, tilt: 0 },
+  benny_hit4: { top: { x: 0.50, y: 0.03 }, face: { x: 0.50, y: 0.21 }, tilt: 0 },
+};
+const HIT_KEYS = ['benny_hit1', 'benny_hit2', 'benny_hit3', 'benny_hit4'];
 
 // woman_dog.png 入面女子同狗各自嘅範圍（向右行時）
 const WOMAN_DOG = {
@@ -77,6 +132,7 @@ const VOICES = [
   { src: 'assets/audio/voice/v3_aiyahoutung.m4a', text: '哎呀好痛！' },
   { src: 'assets/audio/voice/v4_tauhong.m4a', text: '我投降啊！' },
   { src: 'assets/audio/voice/v5_wuisei.m4a', text: '唔好再打啦，再打我會死㗎！' },
+  { src: 'assets/audio/voice/v6_houlantung.m4a', text: '好撚痛呀！' },
 ];
 
 // Benny.jpg 入面塊面嘅範圍（像素），開始畫面頭像用
@@ -141,15 +197,23 @@ window.addEventListener('resize', resize);
 // 素材
 // ============================================================
 const IMG = {};
-function loadImages() {
-  const keys = Object.keys(IMG_SRC);
+// 公園主關要用嘅圖先載入；懲罰相、IFC 天台、燒碳嘅圖等開始畫面出咗之後喺背景慢慢載，手機開得快啲
+const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_)/.test(k);
+function loadImages(keys, showProgress) {
   let done = 0;
   return Promise.all(keys.map((k) => new Promise((res) => {
     const im = new Image();
-    im.onload = () => { IMG[k] = im; done++; $('load-text').textContent = `載入緊… ${done}/${keys.length}`; res(); };
+    im.onload = () => { IMG[k] = im; done++; if (showProgress) $('load-text').textContent = `載入緊… ${done}/${keys.length}`; res(); };
     im.onerror = () => { IMG[k] = null; done++; res(); };
     im.src = IMG_SRC[k];
   })));
+}
+let lateImagesReady = null, lateImagesDone = false;
+// 小遊戲開始前用：背景圖未載完就顯示「載入緊…」，載完先開始
+function whenLateImagesReady(fn) {
+  if (lateImagesDone || !lateImagesReady) { fn(); return; }
+  if (game) floatText('載入緊…', W / 2, H * 0.45, '#7a6a85', 1);
+  lateImagesReady.then(fn);
 }
 
 // 去背圖嘅闊高比
@@ -201,14 +265,39 @@ const Sound = {
     }
     // iOS：要喺用家㩒掣嗰下先「解鎖」每個 audio
     this.voices = VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
-    this.voices.forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
+    this.ifcVoices = IFC_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
+    this.burnVoices = BURN_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
+    [...this.voices, ...this.ifcVoices, ...this.burnVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
   },
 
   setMuted(m) {
     this.muted = m; store.set('kdyz-muted', m ? '1' : '0');
     if (this.master) this.master.gain.value = m ? 0 : 1;
-    this.voices.forEach((a) => { a.muted = m; });
+    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || [])].forEach((a) => { a.muted = m; });
+    const v = document.getElementById('ifc-video'); if (v) v.muted = m;
     $('btn-mute').textContent = m ? '🔇' : '🔊';
+  },
+
+  // IFC 天台語音：同一時間只播一段；force 用嚟跌落去嗰句一定要播
+  ifcVoice(i, force = false) {
+    const now = performance.now();
+    if (!force && now - (this.ifcAt || 0) < 1400) return null;
+    this.ifcAt = now;
+    (this.ifcVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.ifcVoices && this.ifcVoices[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+    return IFC_VOICES[i].text;
+  },
+
+  // 燒碳語音：同 IFC 一樣，同一時間只播一段
+  burnVoice(i, force = false) {
+    const now = performance.now();
+    if (!force && now - (this.burnAt || 0) < 1800) return null;
+    this.burnAt = now;
+    (this.burnVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.burnVoices && this.burnVoices[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+    return BURN_VOICES[i].text;
   },
 
   voice() {
@@ -712,7 +801,7 @@ function startZoom() {
 // ============================================================
 function startPunishIntro() {
   game.phase = 'punishIntro';
-  game.mini = { hits: 0, score: 0, t: 0, tier: 0, bumps: 0, charred: 0, lastHit: -1, swing: 0, hitPt: null, count: 3, motion: false, milestone: 0, topTier: 0 };
+  game.mini = { hits: 0, score: 0, t: 0, tier: 0, bumps: 0, charred: 0, lastHit: -1, swing: 0, hitPt: null, count: 3, motion: false, milestone: 0, topTier: 0, hitKey: HIT_KEYS[0] };
   show('scr-punish');
   const canShake = 'DeviceMotionEvent' in window && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
   $('btn-shake').classList.toggle('hidden', !canShake);
@@ -770,13 +859,17 @@ function punchPoint(key, which) {
 
 function punchKey() {
   const M = game.mini;
-  return M.hits > 0 && game.t - M.lastHit < 0.25 ? 'benny_hit' : 'benny_idle';
+  // 未打過就用原本張相；打咗之後停留喺上一下被打嘅相，直到下一下先換
+  return M.hits > 0 ? M.hitKey : 'benny_idle';
 }
 
 function punishHit(x, y) {
   const M = game.mini;
   const b = bigTargetRect();
-  const face = punchPoint('benny_hit', 'face'), top = punchPoint('benny_hit', 'top');
+  // 每下隨機揀一張被打相，唔會連續兩下同一張
+  let k; do { k = pick(HIT_KEYS); } while (k === M.hitKey && HIT_KEYS.length > 1);
+  M.hitKey = k;
+  const face = punchPoint(k, 'face'), top = punchPoint(k, 'top');
   if (x === null) { x = face.x + rand(-b.w * 0.08, b.w * 0.08); y = face.y + rand(-b.h * 0.08, b.h * 0.08); }
   M.hits++;
   const ti = miniTier(M.hits - 1), tier = CFG.mini.tiers[ti];
@@ -822,7 +915,7 @@ function updatePunish(dt) {
     M.countT += dt;
     if (M.countT >= 0.8) {
       M.countT = 0; M.count--;
-      if (M.count <= 0) { game.phase = 'punish'; show('btn-done'); Sound.sfx('go'); floatText('開打！', W / 2, H * 0.35, '#e86a8c', 1.6); }
+      if (M.count <= 0) { game.phase = 'punish'; punishButtons(true); Sound.sfx('go'); floatText('開打！', W / 2, H * 0.35, '#e86a8c', 1.6); }
       else Sound.sfx('count');
     }
     return;
@@ -837,9 +930,325 @@ function updatePunish(dt) {
 // 撳「完成」：唔限時，打夠自己收手
 function finishPunish() {
   if (!game || game.phase !== 'punish') return;
-  game.phase = 'done'; hide('btn-done');
+  game.phase = 'done'; punishButtons(false);
   Sound.sfx('end'); floatText('收工！', W / 2, H * 0.35, '#e86a8c', 1.5);
   setTimeout(showResult, 1000);
+}
+
+// ============================================================
+// IFC 天台
+// ============================================================
+// 全螢幕播片，播完或者撳「跳過影片」就 onEnd()
+function playIfcVideo(src, onEnd) {
+  const v = $('ifc-video');
+  let done = false;
+  let errTimer = 0;
+  const finish = () => {
+    if (done) return; done = true;
+    clearTimeout(errTimer);
+    v.onended = null; v.onerror = null; $('btn-skip').onclick = null;
+    v.pause(); v.removeAttribute('src'); v.load();
+    hide('ifc-video-layer'); hide('ifc-video-msg');
+    onEnd();
+  };
+  v.muted = Sound.muted;
+  v.src = src;
+  v.onended = finish;
+  // 片載唔到：講清楚原因，3 秒後自動繼續，唔會卡死
+  v.onerror = () => {
+    $('ifc-video-msg').textContent = location.protocol === 'file:'
+      ? '影片播唔到：請用 serve.ps1 開遊戲（唔好直接雙擊 index.html）'
+      : '影片載入唔到，請檢查網絡或者伺服器有冇開緊';
+    show('ifc-video-msg');
+    errTimer = setTimeout(finish, 3000);
+  };
+  $('btn-skip').onclick = finish;
+  hide('ifc-video-msg');
+  show('ifc-video-layer');
+  const p = v.play();
+  // 瀏覽器唔准有聲自動播：改靜音播，片照睇得到
+  if (p) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
+}
+
+function startIfc() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false);
+  game.phase = 'ifcIntro';
+  playIfcVideo(IFC.intro, beginRoof);
+}
+
+function beginRoof() {
+  const mid = Math.floor(IFC.cells / 2);
+  game.ifc = { cell: mid, x: mid, t: 0, stepT: 0, face: 1, bob: 0, pushes: 0, wasNear: false, bubble: null, fallT: 0, score: 0 };
+  game.phase = 'ifc';
+  show('ifc-hud');
+}
+
+function ifcSay(text, t = 1.6) { if (text) game.ifc.bubble = { text, t }; }
+
+function ifcPush() {
+  if (!game || game.phase !== 'ifc' || game.paused) return;
+  const I = game.ifc;
+  I.pushes++; I.face = -1;
+  Sound.sfx('miss');
+  if (I.cell === 0) { ifcFall(); return; }
+  I.cell--;
+  if (I.cell <= IFC.nearEdge) { I.wasNear = true; ifcSay(Sound.ifcVoice(pick(IFC_NEAR))); }
+}
+
+function ifcFall() {
+  const I = game.ifc;
+  game.phase = 'ifcFall'; I.fallT = 0;
+  hide('ifc-hud');
+  I.score = Math.max(IFC.minScore, IFC.fallScore - IFC.perSec * Math.floor(I.t));
+  ifcSay(Sound.ifcVoice(IFC_FALL, true), 2);
+  game.shake = 0.3;
+}
+
+// 返回連打懲罰；add 係 IFC 天台得分（放過佢 = 0）
+function endIfc(add) {
+  const M = game.mini;
+  game.phase = 'punish'; game.ifc = null;
+  hide('ifc-hud'); punishButtons(true);
+  (Sound.ifcVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  if (add > 0) {
+    M.score += add; M.ifcFell = true;
+    floatText(`IFC 天台 +${add}`, W / 2, H * 0.4, '#4f7fd9', 1.3);
+    Sound.sfx('level');
+  }
+}
+
+function ifcCellX(c) { return W * (0.12 + 0.76 * c / (IFC.cells - 1)); }
+
+function updateIfc(dt) {
+  const I = game.ifc;
+  if (I.bubble) { I.bubble.t -= dt; if (I.bubble.t <= 0) I.bubble = null; }
+  if (game.phase === 'ifc') {
+    I.t += dt; I.stepT += dt;
+    while (I.stepT >= IFC.stepSec) {
+      I.stepT -= IFC.stepSec;
+      if (I.cell < IFC.cells - 1) {
+        I.cell++; I.face = 1;
+        // 由邊緣行返出中間：鬆一口氣
+        if (I.wasNear && I.cell >= Math.floor(IFC.cells / 2)) { I.wasNear = false; ifcSay(Sound.ifcVoice(IFC_RELIEF)); }
+      }
+    }
+    I.x += (I.cell - I.x) * Math.min(1, dt * 12);
+    if (Math.abs(I.cell - I.x) > 0.03) I.bob += dt;
+  } else if (game.phase === 'ifcFall') {
+    I.fallT += dt;
+    if (I.fallT >= 1.4) {
+      const add = I.score;
+      game.phase = 'ifcEnding';
+      playIfcVideo(IFC.ending, () => endIfc(add));
+    }
+  }
+}
+
+function drawIfc() {
+  const I = game.ifc;
+  // 背景好闊（2.5:1），以圖片 48% 闊嗰度為中心裁，等手機都見到天台地台同左邊邊緣
+  const bg = IMG.ifc_bg;
+  if (bg) {
+    const s = Math.max(W / bg.width, H / bg.height), dw = bg.width * s, dh = bg.height * s;
+    const ox = clamp(W / 2 - 0.48 * dw, W - dw, 0);
+    ctx.drawImage(bg, ox, (H - dh) / 2, dw, dh);
+  } else drawCover('ifc_bg');
+  const groundY = H * 0.86, h = Math.min(H * 0.5, W * 0.9);
+  // 地上 9 格，最左嗰格紅色提示邊緣
+  ctx.save();
+  for (let c = 0; c < IFC.cells; c++) {
+    ctx.beginPath(); ctx.ellipse(ifcCellX(c), groundY, W * 0.035, H * 0.012, 0, 0, Math.PI * 2);
+    ctx.fillStyle = c === 0 ? 'rgba(232,64,79,.55)' : c === I.cell ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.25)'; ctx.fill();
+  }
+  ctx.font = `900 ${Math.max(14, U * 0.035)}px ${getComputedStyle(document.body).fontFamily}`;
+  ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.fillStyle = '#e8404f';
+  ctx.strokeText('⚠ 邊緣', ifcCellX(0), groundY + H * 0.045); ctx.fillText('⚠ 邊緣', ifcCellX(0), groundY + H * 0.045);
+  ctx.restore();
+
+  // 主角
+  // 主角永遠面向同一邊，左右移動都唔反轉
+  let fx = W * (0.12 + 0.76 * I.x / (IFC.cells - 1)), fy = groundY, opt = {};
+  if (game.phase === 'ifc' || game.phase === 'ifcIntro') {
+    fy -= Math.abs(Math.sin(I.bob * 10)) * U * 0.012;
+    opt.rot = Math.sin(I.bob * 10) * 0.04;
+  } else {
+    // 跌落去：向左飛出、轉、縮細
+    const k = Math.min(1, I.fallT / 1.2);
+    fx -= k * W * 0.35; fy += k * k * H * 0.5 - Math.sin(k * Math.PI) * H * 0.08;
+    opt.rot = -k * 2.2; opt.sx = opt.sy = 1 - k * 0.6;
+  }
+  const r = drawSprite('ifc_benny', fx, fy, h, opt);
+  if (I.bubble) drawBubble(I.bubble.text, fx, r.y, '#4f7fd9');
+
+  // 頂部資料
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(17, U * 0.045);
+  ctx.save(); ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const s = `🏙 IFC 天台 ・ 已撐 ${Math.floor(I.t)} 秒 ・ 推咗 ${I.pushes} 下`;
+  ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.fillStyle = '#34589f'; ctx.fillText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.restore();
+}
+
+// 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
+function punishButtons(on) {
+  ['btn-done', 'btn-ifc', 'btn-burn'].forEach((id) => (on ? show(id) : hide(id)));
+}
+
+// ============================================================
+// 燒碳（救人版）
+// ============================================================
+function startBurn() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false);
+  game.burn = { t: 0, danger: 0, stage: 0, windowOpen: false, furnaceOff: false, bubble: { text: '咳咳……點解咁焗嘅？', t: 2 }, saidAt: 0, nextPlea: 0, doneT: 0, score: 0, smoke: [] };
+  game.phase = 'burn';
+}
+
+// 房間相嘅位置：成間房一定睇晒（左右／上下多出嚟嘅位用模糊背景填）
+function burnStage() {
+  const im = IMG.burn_room, iw = im ? im.width : 1536, ih = im ? im.height : 1024;
+  const s = Math.min(W / iw, H / ih), w = iw * s, h = ih * s;
+  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+const burnPt = (st, p) => ({ x: st.x + p.x * st.w, y: st.y + p.y * st.h });
+
+function burnRects() {
+  const st = burnStage(), B = game.burn;
+  const winKey = B.windowOpen ? 'burn_window_open' : 'burn_window_closed';
+  const wh = BURN.window.h * st.h, ww = wh * aspect(winKey);
+  const wc = burnPt(st, BURN.window);
+  const fh = BURN.furnace.h * st.h, fw = fh * aspect('burn_furnace_on');
+  const fc = burnPt(st, BURN.furnace);
+  return {
+    st,
+    window: { x: wc.x - ww / 2, y: wc.y - wh / 2, w: ww, h: wh },
+    furnace: { x: fc.x - fw / 2, y: fc.y - fh, w: fw, h: fh },
+  };
+}
+
+function onBurnTap(x, y, touch) {
+  const B = game.burn, R = burnRects(), pad = touch ? U * 0.04 : U * 0.01;
+  if (!B.windowOpen && hitRect(R.window, x, y, pad)) {
+    B.windowOpen = true; Sound.sfx('catch');
+    floatText('開窗！', R.window.x + R.window.w / 2, R.window.y, '#3f9a62', 1.1);
+  } else if (!B.furnaceOff && hitRect(R.furnace, x, y, pad)) {
+    B.furnaceOff = true; Sound.sfx('catch');
+    floatText('熄咗碳爐！', R.furnace.x + R.furnace.w / 2, R.furnace.y, '#3f9a62', 1.1);
+    for (let i = 0; i < 8; i++) addFx({ x: R.furnace.x + R.furnace.w * rand(0.3, 0.7), y: R.furnace.y + R.furnace.h * 0.2, vx: rand(-30, 30), vy: rand(-120, -60), r: U * rand(0.015, 0.03), color: 'rgba(230,230,230,.6)', life: 1.2 });
+  } else return;
+  if (B.windowOpen && B.furnaceOff) burnRescued();
+}
+
+function burnRescued() {
+  const B = game.burn;
+  game.phase = 'burnSaved';
+  B.score = Math.max(BURN.minScore, BURN.rescueScore - BURN.perSec * Math.floor(B.t));
+  B.bubble = { text: Sound.burnVoice(BURN_RELIEF, true) || '舒服晒！', t: 2.4 };
+  B.stage = 0;
+  floatText(`救咗佢！+${B.score}`, W / 2, H * 0.3, '#3f9a62', 1.3);
+  Sound.sfx('level');
+}
+
+// 返回連打懲罰
+function endBurn(add) {
+  const M = game.mini;
+  game.phase = 'punish'; game.burn = null;
+  punishButtons(true);
+  (Sound.burnVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  if (add > 0) { M.score += add; M.burnSaved = true; floatText(`燒碳救人 +${add}`, W / 2, H * 0.4, '#e0763a', 1.3); }
+}
+
+function updateBurn(dt) {
+  const B = game.burn;
+  if (B.bubble) { B.bubble.t -= dt; if (B.bubble.t <= 0) B.bubble = null; }
+  // 煙：開咗窗散得快啲
+  const fade = B.windowOpen ? 2.2 : 1;
+  B.smoke = B.smoke.filter((s) => (s.t += dt * fade) < 3);
+  if (game.phase === 'burnSaved') {
+    B.doneT += dt;
+    if (B.doneT >= 2.4) endBurn(B.score);
+    return;
+  }
+  B.t += dt;
+  // 窗同碳爐每解決一樣，辛苦程度升得慢一半
+  const hazards = (B.windowOpen ? 0 : 1) + (B.furnaceOff ? 0 : 1);
+  B.danger += dt * hazards / 2;
+  let st = 0; BURN.stages.forEach((s, i) => { if (B.danger >= s) st = i; });
+  if (st > B.stage) {
+    B.stage = st; B.nextPlea = B.t + 5;
+    const said = Sound.burnVoice(st - 1, true);
+    if (said) B.bubble = { text: said, t: 2.6 };
+  } else if (B.stage >= 3 && B.t >= B.nextPlea) {
+    // 最辛苦嗰階段：輪流求救，等玩家快啲救
+    B.nextPlea = B.t + 5;
+    const said = Sound.burnVoice(pick([2, 3]));
+    if (said) B.bubble = { text: said, t: 2.6 };
+  }
+  // 碳爐未熄就一路出煙
+  if (!B.furnaceOff && Math.random() < dt * 6) {
+    const R = burnRects();
+    B.smoke.push({ x: R.furnace.x + R.furnace.w * rand(0.35, 0.65), y: R.furnace.y + R.furnace.h * 0.15, r: U * rand(0.03, 0.06), t: 0, vx: rand(-15, 15) });
+  }
+}
+
+function drawBurn() {
+  const B = game.burn, R = burnRects(), st = R.st;
+  // 模糊背景填滿，再畫清楚嘅房間
+  ctx.save(); if ('filter' in ctx) ctx.filter = 'blur(10px) brightness(.7)'; drawCover('burn_room'); ctx.restore();
+  if (IMG.burn_room) ctx.drawImage(IMG.burn_room, st.x, st.y, st.w, st.h);
+
+  // 窗：開咗就見到外面藍天
+  const W0 = R.window;
+  if (B.windowOpen) {
+    const g = ctx.createLinearGradient(0, W0.y, 0, W0.y + W0.h);
+    g.addColorStop(0, '#8fd0ff'); g.addColorStop(1, '#dff3ff');
+    ctx.fillStyle = g; ctx.fillRect(W0.x + W0.w * 0.17, W0.y + W0.h * 0.26, W0.w * 0.66, W0.h * 0.67);
+  }
+  const winKey = B.windowOpen ? 'burn_window_open' : 'burn_window_closed';
+  if (IMG[winKey]) ctx.drawImage(IMG[winKey], W0.x, W0.y, W0.w, W0.h);
+
+  // 碳爐
+  const F = R.furnace, fk = B.furnaceOff ? 'burn_furnace_off' : 'burn_furnace_on';
+  if (IMG[fk]) {
+    const flick = B.furnaceOff ? 0 : Math.sin(game.t * 18) * 0.01;
+    ctx.drawImage(IMG[fk], F.x, F.y - F.h * flick, F.w, F.h * (1 + flick));
+  }
+
+  // Benny：未辛苦／救返就坐喺梳化；辛苦就跪喺梳化前面
+  const key = B.stage === 0 ? 'burn_sit' : ['burn_sit', 'burn_scream1', 'burn_scream2', 'burn_scream3'][B.stage];
+  const pos = B.stage === 0 ? BURN.sofa : BURN.floor;
+  const p = burnPt(st, pos), bh = pos.h * st.h * (B.stage === 0 ? 1 : 0.92);
+  const shake = B.stage >= 2 && game.phase === 'burn' ? Math.sin(game.t * 30) * U * 0.004 * B.stage : 0;
+  const r = drawSprite(key, p.x + shake, p.y, bh);
+
+  // 煙：碳爐未熄就越嚟越濃；開窗會散得快啲
+  for (const s of B.smoke) {
+    ctx.fillStyle = `rgba(90,90,90,${(0.28 * (1 - s.t / 3)).toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(s.x + s.vx * s.t, s.y - s.t * st.h * 0.12, s.r * (1 + s.t), 0, Math.PI * 2); ctx.fill();
+  }
+  const haze = game.phase === 'burn' ? Math.min(0.32, B.danger * 0.03) * (B.furnaceOff ? 0.4 : 1) * (B.windowOpen ? 0.5 : 1) : 0;
+  if (haze > 0) { ctx.fillStyle = `rgba(70,70,70,${haze.toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
+
+  // 提示圈：仲未搞掂嘅嘢會一閃一閃
+  if (game.phase === 'burn') {
+    const pulse = 0.5 + 0.5 * Math.sin(game.t * 6);
+    ctx.save(); ctx.lineWidth = 4; ctx.strokeStyle = `rgba(255,214,92,${(0.4 + 0.6 * pulse).toFixed(2)})`;
+    if (!B.windowOpen) { ctx.beginPath(); ctx.roundRect(W0.x - 6, W0.y - 6, W0.w + 12, W0.h + 12, 12); ctx.stroke(); }
+    if (!B.furnaceOff) { ctx.beginPath(); ctx.ellipse(F.x + F.w / 2, F.y + F.h / 2, F.w * 0.62, F.h * 0.6, 0, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  if (B.bubble) drawBubble(B.bubble.text, r.x + r.w / 2, r.y, '#e0763a');
+
+  // 頂部提示
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(16, U * 0.042);
+  ctx.save(); ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const todo = [!B.windowOpen && '撳窗開窗', !B.furnaceOff && '撳碳爐熄火'].filter(Boolean).join('、');
+  const s = game.phase === 'burnSaved' ? '救咗佢！' : `🔥 快啲救佢！${todo} ・ ${Math.floor(B.t)} 秒`;
+  ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.fillStyle = '#a9522a'; ctx.fillText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.restore();
 }
 
 function drawPunish() {
@@ -865,7 +1274,7 @@ function drawPunish() {
   // 頭髮燒焦
   if (M.charred > 0) {
     ctx.save(); ctx.globalAlpha = M.charred * 0.6; ctx.fillStyle = '#2a1d16';
-    ctx.beginPath(); ctx.ellipse(top.x, top.y + b.h * 0.07, b.w * 0.13, b.h * 0.07, key === 'benny_hit' ? -0.25 : 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.beginPath(); ctx.ellipse(top.x, top.y + b.h * 0.07, b.w * 0.13, b.h * 0.07, PUNCH[key].tilt, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
   // 腫包
   for (let i = 0; i < M.bumps; i++) {
@@ -940,7 +1349,7 @@ function showResult() {
   const best = parseInt(store.get('kdyz-best', '0'), 10) || 0;
   const isNew = total > best;
   if (isNew) store.set('kdyz-best', String(total));
-  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name };
+  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved };
 
   $('res-main').textContent = fmt(game.score);
   $('res-time-label').textContent = `用時加分（${game.elapsed.toFixed(1)} 秒）`;
@@ -956,7 +1365,8 @@ function showResult() {
 
 function shareText() {
   const r = lastResult;
-  return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈\n你夠唔夠我快？`;
+  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '');
+  return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈${ifc}\n你夠唔夠我快？`;
 }
 
 function copyText(text) {
@@ -1016,6 +1426,10 @@ function frame(now) {
     if (game.zoom.t >= 1.5) startPunishIntro();
   } else if (['countdown', 'punish', 'done'].includes(game.phase)) {
     updatePunish(dt);
+  } else if (game.phase === 'ifc' || game.phase === 'ifcFall') {
+    updateIfc(dt);
+  } else if (game.phase === 'burn' || game.phase === 'burnSaved') {
+    updateBurn(dt);
   }
   render(dt);
 }
@@ -1028,6 +1442,10 @@ function render(dt) {
     drawMainScene();
   } else if (game.phase === 'punishIntro') {
     drawPunishIntroBg();
+  } else if (game.phase.startsWith('ifc') && game.ifc) {
+    drawIfc();
+  } else if (game.phase.startsWith('burn') && game.burn) {
+    drawBurn();
   } else {
     drawPunish();
   }
@@ -1073,6 +1491,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (!game || game.paused) return;
   const x = e.clientX, y = e.clientY, touch = e.pointerType !== 'mouse';
   if (game.phase === 'main') onMainTap(x, y, touch);
+  else if (game.phase === 'burn') onBurnTap(x, y, touch);
   else if (game.phase === 'punish') {
     const now = performance.now(), id = e.pointerId;
     if (lastTapByPointer[id] && now - lastTapByPointer[id] < CFG.mini.tapMinGap) return;
@@ -1087,11 +1506,20 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 function pause(p) {
   if (!game || ['done'].includes(game.phase)) return;
-  const playing = ['main', 'zoom', 'countdown', 'punish'].includes(game.phase);
-  if (p && playing && !game.paused) { game.paused = true; Sound.suspend(); show('scr-pause'); }
-  else if (!p && game.paused) { game.paused = false; Sound.resume(); hide('scr-pause'); }
+  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved'].includes(game.phase);
+  const v = $('ifc-video'), videoOn = !$('ifc-video-layer').classList.contains('hidden');
+  if (p && playing && !game.paused) {
+    game.paused = true; Sound.suspend(); show('scr-pause');
+    if (videoOn) v.pause();
+  } else if (!p && game.paused) {
+    game.paused = false; Sound.resume(); hide('scr-pause');
+    if (videoOn) v.play().catch(() => {});
+  }
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(true); });
+document.addEventListener('keydown', (e) => {
+  if (game && game.phase === 'ifc' && (e.key === 'ArrowLeft' || e.key === ' ')) { e.preventDefault(); ifcPush(); }
+});
 
 // ============================================================
 // 掣
@@ -1102,10 +1530,21 @@ $('btn-start').addEventListener('click', () => {
   newGame();
 });
 $('btn-again').addEventListener('click', () => {
-  hide('scr-result'); hide('btn-done'); show('hud'); newGame();
+  hide('scr-result'); punishButtons(false); show('hud'); newGame();
 });
-$('btn-punish').addEventListener('click', startCountdown);
+// 懲罰同燒碳要用背景載入嘅圖；IFC 天台唔使等（開場片播緊嗰陣啲圖會載完，而且片要喺撳掣嗰下即刻播先有聲）
+let waitingImages = false;
+const afterImages = (fn) => () => {
+  if (waitingImages) return;
+  waitingImages = true;
+  whenLateImagesReady(() => { waitingImages = false; fn(); });
+};
+$('btn-punish').addEventListener('click', afterImages(startCountdown));
 $('btn-done').addEventListener('click', finishPunish);
+$('btn-ifc').addEventListener('click', startIfc);
+$('btn-burn').addEventListener('click', afterImages(startBurn));
+$('btn-push').addEventListener('click', ifcPush);
+$('btn-spare').addEventListener('click', () => { if (game && game.phase === 'ifc') endIfc(0); });
 $('btn-shake').addEventListener('click', enableShake);
 $('btn-resume').addEventListener('click', () => pause(false));
 $('btn-mute').addEventListener('click', () => { Sound.init(); Sound.setMuted(!Sound.muted); });
@@ -1118,7 +1557,9 @@ $('btn-copy').addEventListener('click', () => {
 // ============================================================
 resize();
 requestAnimationFrame(frame);
-loadImages().then(() => {
+const allKeys = Object.keys(IMG_SRC);
+loadImages(allKeys.filter((k) => !isLateImage(k)), true).then(() => {
+  lateImagesReady = loadImages(allKeys.filter(isLateImage), false).then(() => { lateImagesDone = true; });
   hide('scr-loading'); show('scr-start');
   const best = parseInt(store.get('kdyz-best', '0'), 10) || 0;
   $('best-text').textContent = best ? `最高分：${fmt(best)}` : '';

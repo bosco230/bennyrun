@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -23,6 +23,24 @@
 
 <!-- 小遊戲：完成 -->
 <button id="btn-done" class="hidden">✅ 完成</button>
+
+<!-- 懲罰：IFC 天台（左上角） -->
+<button id="btn-ifc" class="hidden">🏙 IFC 天台</button>
+<!-- 懲罰：燒碳（救人版，喺 IFC 天台下面） -->
+<button id="btn-burn" class="hidden">🔥 燒碳</button>
+
+<!-- IFC 天台：全螢幕影片 -->
+<div id="ifc-video-layer" class="hidden">
+  <video id="ifc-video" playsinline preload="none"></video>
+  <div id="ifc-video-msg" class="hidden"></div>
+  <button id="btn-skip">跳過影片 ⏭</button>
+</div>
+
+<!-- IFC 天台：操作 -->
+<div id="ifc-hud" class="hidden">
+  <button id="btn-push">⬅ 推佢</button>
+  <button id="btn-spare">放過佢</button>
+</div>
 
 <!-- 載入中 -->
 <div id="scr-loading" class="screen">
@@ -94,6 +112,6 @@
   </div>
 </div>
 
-<script src="game.js?v=1"></script>
+<script src="game.js?v=8"></script>
 </body>
 </html>
