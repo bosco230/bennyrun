@@ -62,6 +62,7 @@ const IMG_SRC = {
   ifc_bg: 'assets/ifc/rooftop2.jpg',
   ifc_benny: 'assets/ifc/benny_walking.png',
   burn_room: 'assets/burn/room.jpg',
+  burn_room_portrait: 'assets/burn/room_portrait.jpg',
   burn_sit: 'assets/burn/sit.png',
   burn_scream1: 'assets/burn/scream1.png',
   burn_scream2: 'assets/burn/scream2.png',
@@ -71,6 +72,7 @@ const IMG_SRC = {
   burn_window_closed: 'assets/burn/window_closed.png',
   burn_window_open: 'assets/burn/window_open.png',
   animal_room: 'assets/animal/room.jpg',
+  animal_room_portrait: 'assets/animal/room_portrait.jpg',
   animal_sit: 'assets/animal/sit.png',
   animal_sit_scare: 'assets/animal/sit_scare.png',
   animal_jump1: 'assets/animal/jump1.png?v=2',
@@ -96,6 +98,10 @@ const ANIMAL = {
   bennyH: 0.40, hopSec: 0.7,
   jumpPoses: 6,
   jumpScale: [1, 1, 1, 1, 0.82, 0.82, 0.82],  // 4–6 係上半身相，畫細少少等個頭同其他姿勢差唔多大
+  // 直度手機用另一張直身房間相（853×1844）：梳化喺中間偏上，地下由一半開始；
+  // 呢間房高咗一倍，所以人同動物嘅大細（佔房間高度嘅比例）乘 scale
+  // depth：喺地下越近畫面底（越近鏡頭）畫得越大
+  portrait: { sofa: { x: 0.50, y: 0.47, h: 0.17 }, floor: [0.52, 0.93], wall: [0.10, 0.40], scale: 0.6, depth: 0.7 },
   scareDelay: 0.8,          // 入嚟幾耐之後由坐定轉做嚇親
   maxCritters: 15, score: 20,
   kinds: {
@@ -128,6 +134,13 @@ const BURN = {
   furnace: { x: 0.47, y: 0.93, h: 0.20 },
   sofa: { x: 0.79, y: 0.90, h: 0.46 },  // 坐喺梳化
   floor: { x: 0.74, y: 0.97, h: 0.50 }, // 辛苦到跪喺梳化前面
+  // 直度手機用另一張直身房間相（853×1844），位置用嗰張相嘅比例：窗喺左面牆，梳化喺右邊
+  portrait: {
+    window: { x: 0.19, y: 0.32, h: 0.125 },
+    furnace: { x: 0.30, y: 0.80, h: 0.10 },
+    sofa: { x: 0.71, y: 0.62, h: 0.22 },
+    floor: { x: 0.68, y: 0.80, h: 0.25 },
+  },
 };
 const BURN_VOICES = [
   { src: 'assets/burn/burn_v1.m4a', text: '快啲開窗，好辛苦呀！' },
@@ -1162,7 +1175,7 @@ function punishButtons(on) {
 function startAnimal() {
   if (!game || game.phase !== 'punish' || game.paused) return;
   punishButtons(false); show('animal-hud');
-  const S = ANIMAL.sofa;
+  const S = animalLayout().sofa;
   game.animal = {
     t: 0, critters: [], thrown: 0, bubble: null,
     benny: { onSofa: true, x: S.x, y: S.y, fromX: S.x, fromY: S.y, toX: S.x, toY: S.y, hopT: 0, pose: 1, flip: false },
@@ -1174,7 +1187,7 @@ function onAnimalTap(x, y) {
   const A = game.animal, st = animalStage();
   const u = clamp((x - st.x) / st.w, st.u0 + 0.04, st.u1 - 0.04), v = (y - st.y) / st.h;
   const kind = pick(Object.keys(ANIMAL.kinds)), K = ANIMAL.kinds[kind];
-  const band = K.where === 'wall' ? ANIMAL.wall : ANIMAL.floor;
+  const L = animalLayout(), band = K.where === 'wall' ? L.wall : L.floor;
   const c = { kind, u, v: clamp(v, band[0], band[1]), dir: Math.random() < 0.5 ? -1 : 1, vdir: Math.random() < 0.5 ? -1 : 1, t: 0, phase: Math.random(), nextTurn: rand(0.6, 1.6), stop: 0 };
   c.baseV = c.v;
   A.critters.push(c);
@@ -1191,7 +1204,8 @@ function onAnimalTap(x, y) {
 function nextHop(b) {
   b.fromX = b.x; b.fromY = b.y;
   const st = animalStage();
-  b.toX = rand(Math.max(0.14, st.u0 + 0.08), Math.min(0.86, st.u1 - 0.08)); b.toY = rand(ANIMAL.floor[0] + 0.03, ANIMAL.floor[1]);
+  const L = animalLayout();
+  b.toX = rand(Math.max(0.14, st.u0 + 0.08), Math.min(0.86, st.u1 - 0.08)); b.toY = rand(L.floor[0] + 0.03, L.floor[1]);
   b.hopT = 0; b.pose = b.pose % ANIMAL.jumpPoses + 1; b.flip = b.toX < b.fromX;
 }
 
@@ -1205,7 +1219,7 @@ function updateAnimal(dt) {
     else { b.x = b.fromX + (b.toX - b.fromX) * b.hopT; b.y = b.fromY + (b.toY - b.fromY) * b.hopT; }
   }
   // 動物撞到睇得到嘅房間邊就掉頭（手機裁咗左右）
-  const vis = animalStage(), lo = vis.u0 + 0.03, hi = vis.u1 - 0.03;
+  const vis = animalStage(), lo = vis.u0 + 0.03, hi = vis.u1 - 0.03, L = animalLayout();
   for (const c of A.critters) {
     const K = ANIMAL.kinds[c.kind];
     c.t += dt;
@@ -1218,7 +1232,7 @@ function updateAnimal(dt) {
       c.nextTurn -= dt;
       if (c.nextTurn <= 0) { c.nextTurn = rand(0.8, 2); c.dir = Math.random() < 0.5 ? -1 : 1; c.vdir = Math.random() < 0.5 ? -1 : 1; }
       c.u += c.dir * K.speed * dt; c.v += c.vdir * K.speed * 0.8 * dt;
-      if (c.v < ANIMAL.wall[0] || c.v > ANIMAL.wall[1]) { c.vdir *= -1; c.v = clamp(c.v, ANIMAL.wall[0], ANIMAL.wall[1]); }
+      if (c.v < L.wall[0] || c.v > L.wall[1]) { c.vdir *= -1; c.v = clamp(c.v, L.wall[0], L.wall[1]); }
     } else if (K.move === 'slither') {
       // 蛇／蜈蚣：左右扭住行
       c.u += c.dir * K.speed * dt;
@@ -1229,7 +1243,7 @@ function updateAnimal(dt) {
       if (c.nextTurn <= 0) {
         c.nextTurn = rand(0.4, 1.4);
         if (Math.random() < 0.35) c.stop = rand(0.15, 0.4); else if (Math.random() < 0.5) c.dir *= -1;
-        c.baseV = clamp(c.baseV + rand(-0.04, 0.04), ANIMAL.floor[0], ANIMAL.floor[1]);
+        c.baseV = clamp(c.baseV + rand(-0.04, 0.04), L.floor[0], L.floor[1]);
       }
       if (c.stop > 0) c.stop -= dt; else c.u += c.dir * K.speed * dt;
       c.v += (c.baseV - c.v) * Math.min(1, dt * 4);
@@ -1248,32 +1262,37 @@ function endAnimal() {
 
 function drawCritter(c, st) {
   const K = ANIMAL.kinds[c.kind], key = `animal_${c.kind}`;
+  const sc = animalLayout().scale * (K.where === 'wall' ? 1 : animalDepth(c.v));
   const pop = Math.min(1, c.t / 0.18);
   let fx = st.x + c.u * st.w, fy = st.y + c.v * st.h;
   const opt = { sx: 0.3 + 0.7 * pop, sy: 0.3 + 0.7 * pop };
-  if (K.move === 'hop') fy -= Math.max(0, Math.sin(c.phase / 0.55 * Math.PI)) * (c.phase < 0.55 ? 1 : 0) * st.h * 0.07;
+  if (K.move === 'hop') fy -= Math.max(0, Math.sin(c.phase / 0.55 * Math.PI)) * (c.phase < 0.55 ? 1 : 0) * st.h * 0.07 * sc;
   if (K.move === 'slither') opt.rot = Math.sin(c.t * 3) * 0.06;
   if (K.move === 'crawl') opt.rot = Math.sin(c.t * 2) * 0.12;
   else opt.flip = c.dir < 0;            // 動物圖都係向右，向左行就反轉（蜘蛛係正面，唔使）
-  drawSprite(key, fx, fy, K.h * st.h, opt);
+  drawSprite(key, fx, fy, K.h * st.h * sc, opt);
 }
 
 function drawAnimal() {
   const A = game.animal, b = A.benny;
-  const st = drawRoom('animal_room', ANIMAL_FOCUS);
+  const L = animalLayout();
+  let st;
+  if (animalPortrait()) { st = animalStage(); ctx.drawImage(IMG.animal_room_portrait, st.x, st.y, st.w, st.h); }
+  else st = drawRoom('animal_room', ANIMAL_FOCUS);
   // 牆上嘅蜘蛛先畫，之後地下嘅嘢同 Benny 按前後次序畫
   A.critters.filter((c) => ANIMAL.kinds[c.kind].where === 'wall').forEach((c) => drawCritter(c, st));
   const items = A.critters.filter((c) => ANIMAL.kinds[c.kind].where !== 'wall').map((c) => ({ z: c.v, draw: () => drawCritter(c, st) }));
   let head = null;
-  items.push({ z: b.onSofa ? ANIMAL.sofa.y : b.y, draw: () => {
+  items.push({ z: b.onSofa ? L.sofa.y : b.y, draw: () => {
     let key, h, fx = st.x + b.x * st.w, fy = st.y + b.y * st.h, opt = {};
     if (b.onSofa) {
       key = A.t < ANIMAL.scareDelay ? 'animal_sit' : 'animal_sit_scare';
-      h = ANIMAL.sofa.h * st.h * (key === 'animal_sit' ? 1 : 0.9);
+      h = L.sofa.h * st.h * (key === 'animal_sit' ? 1 : 0.9);
       if (key === 'animal_sit_scare') fx += Math.sin(game.t * 40) * U * 0.002;
     } else {
-      key = `animal_jump${b.pose}`; h = ANIMAL.bennyH * st.h * ANIMAL.jumpScale[b.pose];
-      fy -= Math.sin(b.hopT * Math.PI) * st.h * 0.22;   // 跳起嘅弧線
+      const d = L.scale * animalDepth(b.y);
+      key = `animal_jump${b.pose}`; h = ANIMAL.bennyH * st.h * ANIMAL.jumpScale[b.pose] * d;
+      fy -= Math.sin(b.hopT * Math.PI) * st.h * 0.22 * d;   // 跳起嘅弧線
       opt.flip = b.flip; opt.rot = (b.flip ? -1 : 1) * Math.sin(b.hopT * Math.PI) * 0.08;
     }
     const r = drawSprite(key, fx, fy, h, opt);
@@ -1314,8 +1333,32 @@ function roomStage(key, focusU = 0.5) {
   return { x: w <= W ? (W - w) / 2 : x, y: (H - h) / 2, w, h, u0: Math.max(0, -x / w), u1: Math.min(1, (W - x) / w) };
 }
 const BURN_FOCUS = 0.64, ANIMAL_FOCUS = 0.5;
-const burnStage = () => roomStage('burn_room', BURN_FOCUS);
-const animalStage = () => roomStage('animal_room', ANIMAL_FOCUS);
+// 燒碳：直度畫面（窄過 3:4）用直身房間相，鋪滿成個畫面；其他用原本闊身相
+const burnPortrait = () => W / H < 0.75 && !!IMG.burn_room_portrait;
+const burnLayout = () => (burnPortrait() ? BURN.portrait : BURN);
+function burnStage() {
+  if (!burnPortrait()) return roomStage('burn_room', BURN_FOCUS);
+  const im = IMG.burn_room_portrait, s = Math.max(W / im.width, H / im.height), w = im.width * s, h = im.height * s;
+  const x = (W - w) / 2;
+  return { x, y: (H - h) / 2, w, h, u0: Math.max(0, -x / w), u1: Math.min(1, (W - x) / w) };
+}
+// 蛇蟲鼠蟻：直度畫面用直身房間相（同燒碳一樣），鋪滿成個畫面
+const animalPortrait = () => W / H < 0.75 && !!IMG.animal_room_portrait;
+const ANIMAL_LANDSCAPE = { sofa: ANIMAL.sofa, floor: ANIMAL.floor, wall: ANIMAL.wall, scale: 1 };
+const animalLayout = () => (animalPortrait() ? ANIMAL.portrait : ANIMAL_LANDSCAPE);
+// 遠近：地下 v 越大（越近鏡頭）放大啲；闊身相冇呢個效果
+function animalDepth(v) {
+  const L = animalLayout();
+  if (!L.depth) return 1;
+  const k = clamp((v - L.floor[0]) / (L.floor[1] - L.floor[0]), 0, 1);
+  return 1 - L.depth * 0.35 + L.depth * k;
+}
+function animalStage() {
+  if (!animalPortrait()) return roomStage('animal_room', ANIMAL_FOCUS);
+  const im = IMG.animal_room_portrait, s = Math.max(W / im.width, H / im.height), w = im.width * s, h = im.height * s;
+  const x = (W - w) / 2;
+  return { x, y: (H - h) / 2, w, h, u0: Math.max(0, -x / w), u1: Math.min(1, (W - x) / w) };
+}
 
 function drawRoom(key, focusU) {
   const st = roomStage(key, focusU);
@@ -1326,13 +1369,14 @@ function drawRoom(key, focusU) {
 const burnPt = (st, p) => ({ x: st.x + p.x * st.w, y: st.y + p.y * st.h });
 
 function burnRects() {
-  const st = burnStage(), B = game.burn;
+  const st = burnStage(), B = game.burn, L = burnLayout();
   const winKey = B.windowOpen ? 'burn_window_open' : 'burn_window_closed';
-  const wh = BURN.window.h * st.h, ww = wh * aspect(winKey);
-  // 手機裁咗左邊：窗沿住後面嗰幅牆移入嚟，保持睇到
-  const wc = burnPt(st, { x: st.u0 > 0.05 ? Math.max(BURN.window.x, st.u0 + 0.17) : BURN.window.x, y: BURN.window.y - (st.u0 > 0.05 ? 0.05 : 0) });
-  const fh = BURN.furnace.h * st.h, fw = fh * aspect('burn_furnace_on');
-  const fc = burnPt(st, BURN.furnace);
+  const wh = L.window.h * st.h, ww = wh * aspect(winKey);
+  // 闊身相喺窄畫面裁咗左邊：窗沿住後面嗰幅牆移入嚟，保持睇到（直身相唔使）
+  const shifted = !burnPortrait() && st.u0 > 0.05;
+  const wc = burnPt(st, { x: shifted ? Math.max(L.window.x, st.u0 + 0.17) : L.window.x, y: L.window.y - (shifted ? 0.05 : 0) });
+  const fh = L.furnace.h * st.h, fw = fh * aspect('burn_furnace_on');
+  const fc = burnPt(st, L.furnace);
   return {
     st,
     window: { x: wc.x - ww / 2, y: wc.y - wh / 2, w: ww, h: wh },
@@ -1407,8 +1451,9 @@ function updateBurn(dt) {
 
 function drawBurn() {
   const B = game.burn, R = burnRects(), st = R.st;
-  // 模糊背景填滿，再畫清楚嘅房間
-  drawRoom('burn_room', BURN_FOCUS);
+  // 模糊背景填滿，再畫清楚嘅房間（直度畫面用直身相，鋪滿成個畫面）
+  if (burnPortrait()) ctx.drawImage(IMG.burn_room_portrait, st.x, st.y, st.w, st.h);
+  else drawRoom('burn_room', BURN_FOCUS);
 
   // 窗：開咗就見到外面藍天
   const W0 = R.window;
@@ -1429,7 +1474,7 @@ function drawBurn() {
 
   // Benny：未辛苦／救返就坐喺梳化；辛苦就跪喺梳化前面
   const key = B.stage === 0 ? 'burn_sit' : ['burn_sit', 'burn_scream1', 'burn_scream2', 'burn_scream3'][B.stage];
-  const pos = B.stage === 0 ? BURN.sofa : BURN.floor;
+  const L = burnLayout(), pos = B.stage === 0 ? L.sofa : L.floor;
   const p = burnPt(st, pos), bh = pos.h * st.h * (B.stage === 0 ? 1 : 0.92);
   const shake = B.stage >= 2 && game.phase === 'burn' ? Math.sin(game.t * 30) * U * 0.004 * B.stage : 0;
   const r = drawSprite(key, p.x + shake, p.y, bh);
