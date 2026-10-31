@@ -67,6 +67,22 @@ html, body {
   padding: 9px 16px; border-radius: 999px; box-shadow: 0 4px 0 #3e6e31;
 }
 #btn-animal:active { transform: translateY(3px); box-shadow: 0 1px 0 #3e6e31; }
+#btn-brothel {
+  position: fixed; left: max(12px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 206px);
+  z-index: 6; border: 0; cursor: pointer; font-family: inherit;
+  background: #c8324f; color: #fff; font-size: 17px; font-weight: 900;
+  padding: 9px 16px; border-radius: 999px; box-shadow: 0 4px 0 #8e2138;
+}
+#btn-brothel:active { transform: translateY(3px); box-shadow: 0 1px 0 #8e2138; }
+#brothel-hud {
+  position: fixed; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; justify-content: center; pointer-events: none;
+}
+#btn-brothel-back {
+  pointer-events: auto; border: 3px solid #f3c3cd; background: rgba(255,255,255,.94); color: var(--ink); cursor: pointer;
+  font-family: inherit; font-size: 20px; font-weight: 900; padding: 12px 30px; border-radius: 999px;
+  box-shadow: 0 4px 0 rgba(74,59,82,.2);
+}
 #animal-hud {
   position: fixed; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 6;
   display: flex; justify-content: center; pointer-events: none;

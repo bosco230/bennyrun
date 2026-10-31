@@ -71,6 +71,17 @@ const IMG_SRC = {
   burn_furnace_off: 'assets/burn/furnace_off.png',
   burn_window_closed: 'assets/burn/window_closed.png',
   burn_window_open: 'assets/burn/window_open.png',
+  brothel_bg: 'assets/brothel/bg.jpg',
+  brothel_girl1: 'assets/brothel/girl1.png',
+  brothel_girl2: 'assets/brothel/girl2.png',
+  brothel_girl3: 'assets/brothel/girl3.png',
+  brothel_girl4: 'assets/brothel/girl4.png',
+  brothel_girl5: 'assets/brothel/girl5.png',
+  brothel_girl6: 'assets/brothel/girl6.png',
+  brothel_girl7: 'assets/brothel/girl7.png',
+  brothel_girl8: 'assets/brothel/girl8.png',
+  brothel_kiss1: 'assets/brothel/kiss1.png?v=2',
+  brothel_kiss2: 'assets/brothel/kiss2.png',
   animal_room: 'assets/animal/room.jpg',
   animal_room_portrait: 'assets/animal/room_portrait.jpg',
   animal_sit: 'assets/animal/sit.png',
@@ -258,7 +269,7 @@ window.addEventListener('resize', resize);
 // ============================================================
 const IMG = {};
 // 公園主關要用嘅圖先載入；懲罰相、IFC 天台、燒碳嘅圖等開始畫面出咗之後喺背景慢慢載，手機開得快啲
-const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_)/.test(k);
+const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_)/.test(k);
 function loadImages(keys, showProgress) {
   let done = 0;
   return Promise.all(keys.map((k) => new Promise((res) => {
@@ -328,13 +339,14 @@ const Sound = {
     this.ifcVoices = IFC_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.burnVoices = BURN_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.animalVoices = ANIMAL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
-    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
+    this.brothelVoices = BROTHEL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
+    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
   },
 
   setMuted(m) {
     this.muted = m; store.set('kdyz-muted', m ? '1' : '0');
     if (this.master) this.master.gain.value = m ? 0 : 1;
-    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || [])].forEach((a) => { a.muted = m; });
+    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || [])].forEach((a) => { a.muted = m; });
     const v = document.getElementById('ifc-video'); if (v) v.muted = m;
     $('btn-mute').textContent = m ? '🔇' : '🔊';
   },
@@ -362,6 +374,16 @@ const Sound = {
   },
 
   // 蛇蟲鼠蟻語音：隨機、唔連續重複同一句，同一時間只播一段
+  // 妓寨語音：每撳一次女子都播一句（隨機、唔連續重複），新嗰句會截斷舊嗰句
+  brothelVoice() {
+    let i; do { i = Math.floor(Math.random() * BROTHEL_VOICES.length); } while (i === this.lastBrothel && BROTHEL_VOICES.length > 1);
+    this.lastBrothel = i;
+    (this.brothelVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.brothelVoices && this.brothelVoices[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+    return BROTHEL_VOICES[i].text;
+  },
+
   animalVoice() {
     const now = performance.now();
     if (now - (this.animalAt || 0) < 1500) return null;
@@ -1166,7 +1188,142 @@ function drawIfc() {
 
 // 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
 function punishButtons(on) {
-  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal'].forEach((id) => (on ? show(id) : hide(id)));
+  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel'].forEach((id) => (on ? show(id) : hide(id)));
+}
+
+// ============================================================
+// 妓寨：四個女子周圍行，Benny 喺中間行嚟行去；撳中女子，佢追住 Benny 5 秒，
+// Benny 被迫加速走，追完 Benny 變做 scare 入面隨機一張相。唔限時，撳「放過佢啦」返回
+// ============================================================
+const BROTHEL_FOCUS = 0.74;   // 手機直度畫面裁圖時，以「妓寨」牌匾同大門右邊為中心
+const BROTHEL = {
+  girls: ['brothel_girl1', 'brothel_girl2', 'brothel_girl3', 'brothel_girl4', 'brothel_girl5', 'brothel_girl6', 'brothel_girl7', 'brothel_girl8'],
+  scares: ['brothel_kiss1', 'brothel_kiss2', 'animal_jump1', 'animal_jump2', 'animal_jump3'],
+  area: { x0: 0.12, x1: 0.88, y0: 0.52, y1: 0.94 },   // 地下（畫面比例），y 係腳底
+  bennyArea: { x0: 0.28, x1: 0.72, y0: 0.62, y1: 0.86 },
+  girlH: 0.15, bennyH: 0.30,     // 高度 × min(H, W × 1.6)；人多咗，女子畫細少少
+  girlSpeed: 0.08, bennySpeed: 0.07, chaseSpeed: 0.26, fleeSpeed: 0.30,   // 每秒 × 畫面短邊
+  chaseTime: 5, scareTime: 3,
+};
+const BROTHEL_VOICES = [
+  { src: 'assets/brothel/brothel_v1.m4a', text: '人哋好掛住你啊！' },
+  { src: 'assets/brothel/brothel_v2.m4a', text: '今晚我哋不醉無歸！' },
+  { src: 'assets/brothel/brothel_v3.m4a', text: '你有冇掛住人哋嘅啫？' },
+  { src: 'assets/brothel/brothel_v4.m4a', text: '好衰㗎你，咁耐都唔嚟搵人！' },
+  { src: 'assets/brothel/brothel_v5.m4a', text: '袁公子，快啲返嚟啦！' },
+];
+const brothelUnit = () => Math.min(H, W * 1.6);
+const randIn = (r) => ({ x: rand(r.x0, r.x1), y: rand(r.y0, r.y1) });
+
+function startBrothel() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false); show('brothel-hud');
+  const A = BROTHEL.area;
+  game.brothel = {
+    t: 0, chased: 0,
+    girls: BROTHEL.girls.map((key, i, all) => ({ key, x: A.x0 + (A.x1 - A.x0) * (i + 0.5) / all.length, y: rand(A.y0, A.y1), dest: randIn(A), chase: 0, bob: rand(0, 6), bubble: null })),
+    benny: { x: 0.5, y: 0.74, dest: randIn(BROTHEL.bennyArea), bob: 0, scare: null, scareT: 0, bubble: null },
+  };
+  game.phase = 'brothel';
+}
+
+function endBrothel() {
+  game.phase = 'punish'; game.brothel = null;
+  hide('brothel-hud'); punishButtons(true);
+  (Sound.brothelVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+}
+
+// 用畫面比例座標行路（x 同 y 嘅像素長度唔同，用 moveToward 同一套計法）
+function brothelMove(e, tx, ty, speed, dt) { return moveToward(e, tx, ty, speed, dt); }
+
+function brothelRects() {
+  const Bm = game.brothel, u = brothelUnit(), out = [];
+  for (const g of Bm.girls) {
+    const h = BROTHEL.girlH * u, w = h * aspect(g.key);
+    out.push({ g, x: g.x * W - w / 2, y: g.y * H - h, w, h });
+  }
+  return out;
+}
+
+function onBrothelTap(x, y, touch) {
+  const pad = touch ? U * 0.02 : 0;
+  // 由最前（y 最大）嗰個開始判定
+  const hit = brothelRects().sort((a, b) => b.g.y - a.g.y).find((r) => hitRect(r, x, y, pad));
+  if (!hit) return;
+  const g = hit.g, Bm = game.brothel;
+  g.chase = BROTHEL.chaseTime; Bm.chased++;
+  const said = Sound.brothelVoice();
+  if (said) g.bubble = { text: said, t: 2.2 };
+  floatText('💋', x, y - U * 0.03, '#e8406a', 1);
+  Bm.benny.bubble = { text: pick(['唔好呀！', '救命呀！', '我走先！']), t: 1.2 };
+}
+
+function updateBrothel(dt) {
+  const Bm = game.brothel, b = Bm.benny, A = BROTHEL.area, BA = BROTHEL.bennyArea;
+  Bm.t += dt;
+  const chasers = Bm.girls.filter((g) => g.chase > 0);
+  for (const g of Bm.girls) {
+    g.bob += dt;
+    if (g.bubble) { g.bubble.t -= dt; if (g.bubble.t <= 0) g.bubble = null; }
+    if (g.chase > 0) {
+      g.chase -= dt;
+      brothelMove(g, b.x, b.y + 0.01, BROTHEL.chaseSpeed, dt);
+      // 追完：Benny 變做隨機一張 scare 相（唔會連續兩次同一張）
+      if (g.chase <= 0) {
+        let k; do { k = pick(BROTHEL.scares); } while (k === b.scare && BROTHEL.scares.length > 1);
+        b.scare = k; b.scareT = BROTHEL.scareTime;
+        b.bubble = { text: pick(['嗚……', '我唔想呀！', '放過我啦！']), t: 1.6 };
+      }
+    } else if (brothelMove(g, g.dest.x, g.dest.y, BROTHEL.girlSpeed, dt)) g.dest = randIn(A);
+  }
+  if (b.bubble) { b.bubble.t -= dt; if (b.bubble.t <= 0) b.bubble = null; }
+  if (b.scareT > 0) { b.scareT -= dt; if (b.scareT <= 0) b.scare = null; }
+  b.bob += dt;
+  if (chasers.length) {
+    // 俾人追：向遠離追佢嘅女子嘅方向加速走，撞邊就沿住邊走
+    let dx = 0, dy = 0;
+    for (const g of chasers) { const ex = (b.x - g.x) * W, ey = (b.y - g.y) * H, d = Math.hypot(ex, ey) || 1; dx += ex / d; dy += ey / d; }
+    const d = Math.hypot(dx, dy) || 1;
+    const tx = clamp(b.x + dx / d * 0.2, A.x0, A.x1), ty = clamp(b.y + dy / d * 0.2, A.y0, A.y1);
+    brothelMove(b, tx, ty, BROTHEL.fleeSpeed, dt);
+    b.dest = randIn(BA);
+  } else if (brothelMove(b, b.dest.x, b.dest.y, BROTHEL.bennySpeed, dt)) b.dest = randIn(BA);
+}
+
+function drawBrothel() {
+  // 鋪滿成個畫面；直度手機左右裁走，保留大門同「妓寨」牌匾
+  const im = IMG.brothel_bg;
+  if (!im) { ctx.fillStyle = '#3a1520'; ctx.fillRect(0, 0, W, H); }
+  else {
+    const s = Math.max(W / im.width, H / im.height), w = im.width * s, h = im.height * s;
+    const x = clamp(W / 2 - BROTHEL_FOCUS * w, W - w, 0);
+    ctx.drawImage(im, x, (H - h) / 2, w, h);
+  }
+  const Bm = game.brothel;
+  if (!Bm) return;
+  const u = brothelUnit(), b = Bm.benny, items = [], bubbles = [];
+  for (const g of Bm.girls) items.push({ z: g.y, draw: () => {
+    const moving = g.chase > 0 ? 18 : 7;
+    const r = drawSprite(g.key, g.x * W, g.y * H - Math.abs(Math.sin(g.bob * moving)) * u * 0.008, BROTHEL.girlH * u, { rot: Math.sin(g.bob * moving) * 0.04 });
+    if (g.chase > 0) { ctx.save(); ctx.strokeStyle = '#ff4f7b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(r.x + r.w / 2, g.y * H, r.w * 0.45, u * 0.012, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+    if (g.bubble) bubbles.push([g.bubble.text, r.x + r.w / 2, r.y, '#c8324f']);
+  } });
+  items.push({ z: b.y, draw: () => {
+    const key = b.scare || 'benny_idle';
+    const fleeing = Bm.girls.some((g) => g.chase > 0);
+    const sp = fleeing ? 16 : 7;
+    const r = drawSprite(key, b.x * W, b.y * H - Math.abs(Math.sin(b.bob * sp)) * u * 0.01, BROTHEL.bennyH * u, { rot: Math.sin(b.bob * sp) * 0.035 });
+    if (b.bubble) bubbles.push([b.bubble.text, r.x + r.w / 2, r.y, '#4a3b52']);
+  } });
+  items.sort((p, q) => p.z - q.z).forEach((d) => d.draw());
+  for (const bb of bubbles) drawBubble(...bb);
+
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(16, U * 0.042);
+  ctx.save(); ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const s = `🏮 撳女仔，佢會追住袁公子！ ・ 追咗 ${Bm.chased} 次`;
+  ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.fillStyle = '#8e2138'; ctx.fillText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.restore();
 }
 
 // ============================================================
@@ -1689,6 +1846,8 @@ function frame(now) {
     updateBurn(dt);
   } else if (game.phase === 'animal') {
     updateAnimal(dt);
+  } else if (game.phase === 'brothel' && game.brothel) {
+    updateBrothel(dt);
   }
   render(dt);
 }
@@ -1707,6 +1866,8 @@ function render(dt) {
     drawBurn();
   } else if (game.phase === 'animal' && game.animal) {
     drawAnimal();
+  } else if (game.phase === 'brothel') {
+    drawBrothel();
   } else {
     drawPunish();
   }
@@ -1754,6 +1915,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (game.phase === 'main') onMainTap(x, y, touch);
   else if (game.phase === 'burn') onBurnTap(x, y, touch);
   else if (game.phase === 'animal') onAnimalTap(x, y);
+  else if (game.phase === 'brothel' && game.brothel) onBrothelTap(x, y, touch);
   else if (game.phase === 'punish') {
     const now = performance.now(), id = e.pointerId;
     if (lastTapByPointer[id] && now - lastTapByPointer[id] < CFG.mini.tapMinGap) return;
@@ -1768,7 +1930,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 function pause(p) {
   if (!game || ['done'].includes(game.phase)) return;
-  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal'].includes(game.phase);
+  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel'].includes(game.phase);
   const v = $('ifc-video'), videoOn = !$('ifc-video-layer').classList.contains('hidden');
   if (p && playing && !game.paused) {
     game.paused = true; Sound.suspend(); show('scr-pause');
@@ -1807,6 +1969,8 @@ $('btn-ifc').addEventListener('click', startIfc);
 $('btn-burn').addEventListener('click', afterImages(startBurn));
 $('btn-animal').addEventListener('click', afterImages(startAnimal));
 $('btn-animal-spare').addEventListener('click', () => { if (game && game.phase === 'animal') endAnimal(); });
+$('btn-brothel').addEventListener('click', afterImages(startBrothel));
+$('btn-brothel-back').addEventListener('click', () => { if (game && game.phase === 'brothel') endBrothel(); });
 $('btn-push').addEventListener('click', ifcPush);
 $('btn-spare').addEventListener('click', () => { if (game && game.phase === 'ifc') endIfc(0); });
 $('btn-shake').addEventListener('click', enableShake);

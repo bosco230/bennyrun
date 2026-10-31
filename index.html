@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -30,6 +30,12 @@
 <button id="btn-burn" class="hidden">🔥 燒碳</button>
 <!-- 懲罰：蛇蟲鼠蟻（喺燒碳下面） -->
 <button id="btn-animal" class="hidden">🐍 蛇蟲鼠蟻</button>
+
+<!-- 懲罰：妓寨（喺蛇蟲鼠蟻下面） -->
+<button id="btn-brothel" class="hidden">🏮 妓寨</button>
+<div id="brothel-hud" class="hidden">
+  <button id="btn-brothel-back">放過佢啦</button>
+</div>
 
 <!-- 蛇蟲鼠蟻：冇完結，撳「放過佢」返回 -->
 <div id="animal-hud" class="hidden">
@@ -119,6 +125,6 @@
   </div>
 </div>
 
-<script src="game.js?v=18"></script>
+<script src="game.js?v=22"></script>
 </body>
 </html>
