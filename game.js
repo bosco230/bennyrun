@@ -70,7 +70,46 @@ const IMG_SRC = {
   burn_furnace_off: 'assets/burn/furnace_off.png',
   burn_window_closed: 'assets/burn/window_closed.png',
   burn_window_open: 'assets/burn/window_open.png',
+  animal_room: 'assets/animal/room.jpg',
+  animal_sit: 'assets/animal/sit.png',
+  animal_sit_scare: 'assets/animal/sit_scare.png',
+  animal_jump1: 'assets/animal/jump1.png?v=2',
+  animal_jump2: 'assets/animal/jump2.png?v=2',
+  animal_jump3: 'assets/animal/jump3.png?v=2',
+  animal_centipede: 'assets/animal/centipede.png',
+  animal_cockroach: 'assets/animal/cockroach.png',
+  animal_grasshopper: 'assets/animal/grasshopper.png',
+  animal_mouse: 'assets/animal/mouse.png',
+  animal_snake: 'assets/animal/snake.png',
+  animal_spider: 'assets/animal/spider.png',
 };
+
+// 蛇蟲鼠蟻：每撳一下掟一隻隨機動物入房，Benny 嚇到周圍跳；冇完結，撳「放過佢」返回
+// 位置用房間相（1536×1024）嘅比例座標；h 係高度（× 房間高度），speed 係每秒行幾多個房間闊度
+const ANIMAL = {
+  sofa: { x: 0.49, y: 0.80, h: 0.40 },
+  floor: [0.80, 0.97],      // 地下嘅 y 範圍
+  wall: [0.10, 0.60],       // 牆身嘅 y 範圍（蜘蛛用）
+  bennyH: 0.40, hopSec: 0.7,
+  scareDelay: 0.8,          // 入嚟幾耐之後由坐定轉做嚇親
+  maxCritters: 15, score: 20,
+  kinds: {
+    grasshopper: { h: 0.091, where: 'floor', speed: 0.16, move: 'hop' },
+    spider:      { h: 0.07, where: 'wall',  speed: 0.05, move: 'crawl' },
+    snake:       { h: 0.095, where: 'floor', speed: 0.07, move: 'slither' },
+    mouse:       { h: 0.072, where: 'floor', speed: 0.30, move: 'dash' },
+    cockroach:   { h: 0.09, where: 'floor', speed: 0.26, move: 'dash' },
+    centipede:   { h: 0.12, where: 'floor', speed: 0.06, move: 'slither' },
+  },
+};
+const ANIMAL_VOICES = [
+  { src: 'assets/animal/animal_v1.m4a', text: '唔好再掟啦，我投降啦！' },
+  { src: 'assets/animal/animal_v2.m4a', text: '好驚啊，好驚呀，快啲停呀！' },
+  { src: 'assets/animal/animal_v3.m4a', text: '放過我啦好冇？' },
+  { src: 'assets/animal/animal_v4.m4a', text: '救命呀，我閃！' },
+  { src: 'assets/animal/animal_v5.m4a', text: '玩呢啲？' },
+  { src: 'assets/animal/animal_v6.m4a', text: '我做鬼都唔會放過你！' },
+];
 
 // 燒碳（救人版）：碳爐燒緊、窗閂住，Benny 越嚟越辛苦；玩家要開窗同熄碳爐救佢
 // 位置用房間相（1536×1024）嘅比例座標；y 係底部（腳）
@@ -198,7 +237,7 @@ window.addEventListener('resize', resize);
 // ============================================================
 const IMG = {};
 // 公園主關要用嘅圖先載入；懲罰相、IFC 天台、燒碳嘅圖等開始畫面出咗之後喺背景慢慢載，手機開得快啲
-const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_)/.test(k);
+const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_)/.test(k);
 function loadImages(keys, showProgress) {
   let done = 0;
   return Promise.all(keys.map((k) => new Promise((res) => {
@@ -267,13 +306,14 @@ const Sound = {
     this.voices = VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.ifcVoices = IFC_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.burnVoices = BURN_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
-    [...this.voices, ...this.ifcVoices, ...this.burnVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
+    this.animalVoices = ANIMAL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
+    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
   },
 
   setMuted(m) {
     this.muted = m; store.set('kdyz-muted', m ? '1' : '0');
     if (this.master) this.master.gain.value = m ? 0 : 1;
-    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || [])].forEach((a) => { a.muted = m; });
+    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || [])].forEach((a) => { a.muted = m; });
     const v = document.getElementById('ifc-video'); if (v) v.muted = m;
     $('btn-mute').textContent = m ? '🔇' : '🔊';
   },
@@ -298,6 +338,19 @@ const Sound = {
     const a = this.burnVoices && this.burnVoices[i];
     if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
     return BURN_VOICES[i].text;
+  },
+
+  // 蛇蟲鼠蟻語音：隨機、唔連續重複同一句，同一時間只播一段
+  animalVoice() {
+    const now = performance.now();
+    if (now - (this.animalAt || 0) < 1500) return null;
+    this.animalAt = now;
+    let i; do { i = Math.floor(Math.random() * ANIMAL_VOICES.length); } while (i === this.lastAnimal && ANIMAL_VOICES.length > 1);
+    this.lastAnimal = i;
+    (this.animalVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.animalVoices && this.animalVoices[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+    return ANIMAL_VOICES[i].text;
   },
 
   voice() {
@@ -1092,7 +1145,139 @@ function drawIfc() {
 
 // 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
 function punishButtons(on) {
-  ['btn-done', 'btn-ifc', 'btn-burn'].forEach((id) => (on ? show(id) : hide(id)));
+  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal'].forEach((id) => (on ? show(id) : hide(id)));
+}
+
+// ============================================================
+// 蛇蟲鼠蟻
+// ============================================================
+function startAnimal() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false); show('animal-hud');
+  const S = ANIMAL.sofa;
+  game.animal = {
+    t: 0, critters: [], thrown: 0, bubble: null,
+    benny: { onSofa: true, x: S.x, y: S.y, fromX: S.x, fromY: S.y, toX: S.x, toY: S.y, hopT: 0, pose: 1, flip: false },
+  };
+  game.phase = 'animal';
+}
+
+function onAnimalTap(x, y) {
+  const A = game.animal, st = roomStage('animal_room');
+  const u = clamp((x - st.x) / st.w, 0.04, 0.96), v = (y - st.y) / st.h;
+  const kind = pick(Object.keys(ANIMAL.kinds)), K = ANIMAL.kinds[kind];
+  const band = K.where === 'wall' ? ANIMAL.wall : ANIMAL.floor;
+  const c = { kind, u, v: clamp(v, band[0], band[1]), dir: Math.random() < 0.5 ? -1 : 1, vdir: Math.random() < 0.5 ? -1 : 1, t: 0, phase: Math.random(), nextTurn: rand(0.6, 1.6), stop: 0 };
+  c.baseV = c.v;
+  A.critters.push(c);
+  if (A.critters.length > ANIMAL.maxCritters) A.critters.shift();
+  A.thrown++;
+  floatText(`+${ANIMAL.score}`, x, y - U * 0.04, '#5c9a4a', 0.8);
+  Sound.sfx('miss');
+  // 第一隻掟入嚟：Benny 由梳化彈起身，開始周圍跳
+  if (A.benny.onSofa) { A.benny.onSofa = false; nextHop(A.benny); }
+  const said = Sound.animalVoice();
+  if (said) A.bubble = { text: said, t: 1.8 };
+}
+
+function nextHop(b) {
+  b.fromX = b.x; b.fromY = b.y;
+  b.toX = rand(0.14, 0.86); b.toY = rand(ANIMAL.floor[0] + 0.03, ANIMAL.floor[1]);
+  b.hopT = 0; b.pose = b.pose % 3 + 1; b.flip = b.toX < b.fromX;
+}
+
+function updateAnimal(dt) {
+  const A = game.animal, b = A.benny;
+  A.t += dt;
+  if (A.bubble) { A.bubble.t -= dt; if (A.bubble.t <= 0) A.bubble = null; }
+  if (!b.onSofa) {
+    b.hopT += dt / ANIMAL.hopSec;
+    if (b.hopT >= 1) { b.x = b.toX; b.y = b.toY; nextHop(b); }
+    else { b.x = b.fromX + (b.toX - b.fromX) * b.hopT; b.y = b.fromY + (b.toY - b.fromY) * b.hopT; }
+  }
+  for (const c of A.critters) {
+    const K = ANIMAL.kinds[c.kind];
+    c.t += dt;
+    if (K.move === 'hop') {
+      // 草蜢：一跳一跳，喺半空先郁
+      c.phase = (c.phase + dt / 0.8) % 1;
+      if (c.phase < 0.55) c.u += c.dir * K.speed * dt * 1.8;
+    } else if (K.move === 'crawl') {
+      // 蜘蛛：喺牆上周圍爬，間中轉方向
+      c.nextTurn -= dt;
+      if (c.nextTurn <= 0) { c.nextTurn = rand(0.8, 2); c.dir = Math.random() < 0.5 ? -1 : 1; c.vdir = Math.random() < 0.5 ? -1 : 1; }
+      c.u += c.dir * K.speed * dt; c.v += c.vdir * K.speed * 0.8 * dt;
+      if (c.v < ANIMAL.wall[0] || c.v > ANIMAL.wall[1]) { c.vdir *= -1; c.v = clamp(c.v, ANIMAL.wall[0], ANIMAL.wall[1]); }
+    } else if (K.move === 'slither') {
+      // 蛇／蜈蚣：左右扭住行
+      c.u += c.dir * K.speed * dt;
+      c.v = c.baseV + Math.sin(c.t * 3) * 0.012;
+    } else {
+      // 老鼠／曱甴：快速亂竄，會停一停、突然轉頭
+      c.nextTurn -= dt;
+      if (c.nextTurn <= 0) {
+        c.nextTurn = rand(0.4, 1.4);
+        if (Math.random() < 0.35) c.stop = rand(0.15, 0.4); else if (Math.random() < 0.5) c.dir *= -1;
+        c.baseV = clamp(c.baseV + rand(-0.04, 0.04), ANIMAL.floor[0], ANIMAL.floor[1]);
+      }
+      if (c.stop > 0) c.stop -= dt; else c.u += c.dir * K.speed * dt;
+      c.v += (c.baseV - c.v) * Math.min(1, dt * 4);
+    }
+    if (c.u < 0.03 || c.u > 0.97) { c.dir *= -1; c.u = clamp(c.u, 0.03, 0.97); }
+  }
+}
+
+function endAnimal() {
+  const A = game.animal, M = game.mini, add = A.thrown * ANIMAL.score;
+  game.phase = 'punish'; game.animal = null;
+  hide('animal-hud'); punishButtons(true);
+  (Sound.animalVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  if (add > 0) { M.score += add; M.animalThrown = (M.animalThrown || 0) + A.thrown; floatText(`蛇蟲鼠蟻 +${add}`, W / 2, H * 0.4, '#5c9a4a', 1.3); }
+}
+
+function drawCritter(c, st) {
+  const K = ANIMAL.kinds[c.kind], key = `animal_${c.kind}`;
+  const pop = Math.min(1, c.t / 0.18);
+  let fx = st.x + c.u * st.w, fy = st.y + c.v * st.h;
+  const opt = { sx: 0.3 + 0.7 * pop, sy: 0.3 + 0.7 * pop };
+  if (K.move === 'hop') fy -= Math.max(0, Math.sin(c.phase / 0.55 * Math.PI)) * (c.phase < 0.55 ? 1 : 0) * st.h * 0.07;
+  if (K.move === 'slither') opt.rot = Math.sin(c.t * 3) * 0.06;
+  if (K.move === 'crawl') opt.rot = Math.sin(c.t * 2) * 0.12;
+  else opt.flip = c.dir < 0;            // 動物圖都係向右，向左行就反轉（蜘蛛係正面，唔使）
+  drawSprite(key, fx, fy, K.h * st.h, opt);
+}
+
+function drawAnimal() {
+  const A = game.animal, b = A.benny;
+  const st = drawRoom('animal_room');
+  // 牆上嘅蜘蛛先畫，之後地下嘅嘢同 Benny 按前後次序畫
+  A.critters.filter((c) => ANIMAL.kinds[c.kind].where === 'wall').forEach((c) => drawCritter(c, st));
+  const items = A.critters.filter((c) => ANIMAL.kinds[c.kind].where !== 'wall').map((c) => ({ z: c.v, draw: () => drawCritter(c, st) }));
+  let head = null;
+  items.push({ z: b.onSofa ? ANIMAL.sofa.y : b.y, draw: () => {
+    let key, h, fx = st.x + b.x * st.w, fy = st.y + b.y * st.h, opt = {};
+    if (b.onSofa) {
+      key = A.t < ANIMAL.scareDelay ? 'animal_sit' : 'animal_sit_scare';
+      h = ANIMAL.sofa.h * st.h * (key === 'animal_sit' ? 1 : 0.9);
+      if (key === 'animal_sit_scare') fx += Math.sin(game.t * 40) * U * 0.002;
+    } else {
+      key = `animal_jump${b.pose}`; h = ANIMAL.bennyH * st.h;
+      fy -= Math.sin(b.hopT * Math.PI) * st.h * 0.22;   // 跳起嘅弧線
+      opt.flip = b.flip; opt.rot = (b.flip ? -1 : 1) * Math.sin(b.hopT * Math.PI) * 0.08;
+    }
+    const r = drawSprite(key, fx, fy, h, opt);
+    head = { x: r.x + r.w / 2, y: r.y };
+  } });
+  items.sort((p, q) => p.z - q.z).forEach((d) => d.draw());
+  if (A.bubble && head) drawBubble(A.bubble.text, head.x, head.y, '#5c9a4a');
+
+  // 頂部提示
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(16, U * 0.042);
+  ctx.save(); ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const s = `🐍 撳畫面掟動物！ ・ 掟咗 ${A.thrown} 隻`;
+  ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.fillStyle = '#3e6e31'; ctx.fillText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.restore();
 }
 
 // ============================================================
@@ -1106,10 +1291,18 @@ function startBurn() {
 }
 
 // 房間相嘅位置：成間房一定睇晒（左右／上下多出嚟嘅位用模糊背景填）
-function burnStage() {
-  const im = IMG.burn_room, iw = im ? im.width : 1536, ih = im ? im.height : 1024;
+function roomStage(key) {
+  const im = IMG[key], iw = im ? im.width : 1536, ih = im ? im.height : 1024;
   const s = Math.min(W / iw, H / ih), w = iw * s, h = ih * s;
   return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+const burnStage = () => roomStage('burn_room');
+
+function drawRoom(key) {
+  const st = roomStage(key);
+  ctx.save(); if ('filter' in ctx) ctx.filter = 'blur(10px) brightness(.7)'; drawCover(key); ctx.restore();
+  if (IMG[key]) ctx.drawImage(IMG[key], st.x, st.y, st.w, st.h);
+  return st;
 }
 const burnPt = (st, p) => ({ x: st.x + p.x * st.w, y: st.y + p.y * st.h });
 
@@ -1195,8 +1388,7 @@ function updateBurn(dt) {
 function drawBurn() {
   const B = game.burn, R = burnRects(), st = R.st;
   // 模糊背景填滿，再畫清楚嘅房間
-  ctx.save(); if ('filter' in ctx) ctx.filter = 'blur(10px) brightness(.7)'; drawCover('burn_room'); ctx.restore();
-  if (IMG.burn_room) ctx.drawImage(IMG.burn_room, st.x, st.y, st.w, st.h);
+  drawRoom('burn_room');
 
   // 窗：開咗就見到外面藍天
   const W0 = R.window;
@@ -1349,7 +1541,7 @@ function showResult() {
   const best = parseInt(store.get('kdyz-best', '0'), 10) || 0;
   const isNew = total > best;
   if (isNew) store.set('kdyz-best', String(total));
-  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved };
+  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0 };
 
   $('res-main').textContent = fmt(game.score);
   $('res-time-label').textContent = `用時加分（${game.elapsed.toFixed(1)} 秒）`;
@@ -1365,7 +1557,7 @@ function showResult() {
 
 function shareText() {
   const r = lastResult;
-  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '');
+  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '');
   return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈${ifc}\n你夠唔夠我快？`;
 }
 
@@ -1430,6 +1622,8 @@ function frame(now) {
     updateIfc(dt);
   } else if (game.phase === 'burn' || game.phase === 'burnSaved') {
     updateBurn(dt);
+  } else if (game.phase === 'animal') {
+    updateAnimal(dt);
   }
   render(dt);
 }
@@ -1446,6 +1640,8 @@ function render(dt) {
     drawIfc();
   } else if (game.phase.startsWith('burn') && game.burn) {
     drawBurn();
+  } else if (game.phase === 'animal' && game.animal) {
+    drawAnimal();
   } else {
     drawPunish();
   }
@@ -1492,6 +1688,7 @@ canvas.addEventListener('pointerdown', (e) => {
   const x = e.clientX, y = e.clientY, touch = e.pointerType !== 'mouse';
   if (game.phase === 'main') onMainTap(x, y, touch);
   else if (game.phase === 'burn') onBurnTap(x, y, touch);
+  else if (game.phase === 'animal') onAnimalTap(x, y);
   else if (game.phase === 'punish') {
     const now = performance.now(), id = e.pointerId;
     if (lastTapByPointer[id] && now - lastTapByPointer[id] < CFG.mini.tapMinGap) return;
@@ -1506,7 +1703,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 function pause(p) {
   if (!game || ['done'].includes(game.phase)) return;
-  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved'].includes(game.phase);
+  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal'].includes(game.phase);
   const v = $('ifc-video'), videoOn = !$('ifc-video-layer').classList.contains('hidden');
   if (p && playing && !game.paused) {
     game.paused = true; Sound.suspend(); show('scr-pause');
@@ -1543,6 +1740,8 @@ $('btn-punish').addEventListener('click', afterImages(startCountdown));
 $('btn-done').addEventListener('click', finishPunish);
 $('btn-ifc').addEventListener('click', startIfc);
 $('btn-burn').addEventListener('click', afterImages(startBurn));
+$('btn-animal').addEventListener('click', afterImages(startAnimal));
+$('btn-animal-spare').addEventListener('click', () => { if (game && game.phase === 'animal') endAnimal(); });
 $('btn-push').addEventListener('click', ifcPush);
 $('btn-spare').addEventListener('click', () => { if (game && game.phase === 'ifc') endIfc(0); });
 $('btn-shake').addEventListener('click', enableShake);

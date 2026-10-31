@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -28,6 +28,13 @@
 <button id="btn-ifc" class="hidden">🏙 IFC 天台</button>
 <!-- 懲罰：燒碳（救人版，喺 IFC 天台下面） -->
 <button id="btn-burn" class="hidden">🔥 燒碳</button>
+<!-- 懲罰：蛇蟲鼠蟻（喺燒碳下面） -->
+<button id="btn-animal" class="hidden">🐍 蛇蟲鼠蟻</button>
+
+<!-- 蛇蟲鼠蟻：冇完結，撳「放過佢」返回 -->
+<div id="animal-hud" class="hidden">
+  <button id="btn-animal-spare">放過佢</button>
+</div>
 
 <!-- IFC 天台：全螢幕影片 -->
 <div id="ifc-video-layer" class="hidden">
@@ -112,6 +119,6 @@
   </div>
 </div>
 
-<script src="game.js?v=8"></script>
+<script src="game.js?v=13"></script>
 </body>
 </html>
