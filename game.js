@@ -76,6 +76,9 @@ const IMG_SRC = {
   animal_jump1: 'assets/animal/jump1.png?v=2',
   animal_jump2: 'assets/animal/jump2.png?v=2',
   animal_jump3: 'assets/animal/jump3.png?v=2',
+  animal_jump4: 'assets/animal/jump4.png',   // 老鼠上身
+  animal_jump5: 'assets/animal/jump5.png',   // 曱甴上身
+  animal_jump6: 'assets/animal/jump6.png',   // 蜘蛛上身
   animal_centipede: 'assets/animal/centipede.png',
   animal_cockroach: 'assets/animal/cockroach.png',
   animal_grasshopper: 'assets/animal/grasshopper.png',
@@ -91,6 +94,8 @@ const ANIMAL = {
   floor: [0.80, 0.97],      // 地下嘅 y 範圍
   wall: [0.10, 0.60],       // 牆身嘅 y 範圍（蜘蛛用）
   bennyH: 0.40, hopSec: 0.7,
+  jumpPoses: 6,
+  jumpScale: [1, 1, 1, 1, 0.82, 0.82, 0.82],  // 4–6 係上半身相，畫細少少等個頭同其他姿勢差唔多大
   scareDelay: 0.8,          // 入嚟幾耐之後由坐定轉做嚇親
   maxCritters: 15, score: 20,
   kinds: {
@@ -1183,7 +1188,7 @@ function onAnimalTap(x, y) {
 function nextHop(b) {
   b.fromX = b.x; b.fromY = b.y;
   b.toX = rand(0.14, 0.86); b.toY = rand(ANIMAL.floor[0] + 0.03, ANIMAL.floor[1]);
-  b.hopT = 0; b.pose = b.pose % 3 + 1; b.flip = b.toX < b.fromX;
+  b.hopT = 0; b.pose = b.pose % ANIMAL.jumpPoses + 1; b.flip = b.toX < b.fromX;
 }
 
 function updateAnimal(dt) {
@@ -1261,7 +1266,7 @@ function drawAnimal() {
       h = ANIMAL.sofa.h * st.h * (key === 'animal_sit' ? 1 : 0.9);
       if (key === 'animal_sit_scare') fx += Math.sin(game.t * 40) * U * 0.002;
     } else {
-      key = `animal_jump${b.pose}`; h = ANIMAL.bennyH * st.h;
+      key = `animal_jump${b.pose}`; h = ANIMAL.bennyH * st.h * ANIMAL.jumpScale[b.pose];
       fy -= Math.sin(b.hopT * Math.PI) * st.h * 0.22;   // 跳起嘅弧線
       opt.flip = b.flip; opt.rot = (b.flip ? -1 : 1) * Math.sin(b.hopT * Math.PI) * 0.08;
     }
