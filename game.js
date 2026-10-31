@@ -114,6 +114,9 @@ const ANIMAL_VOICES = [
   { src: 'assets/animal/animal_v4.m4a', text: '救命呀，我閃！' },
   { src: 'assets/animal/animal_v5.m4a', text: '玩呢啲？' },
   { src: 'assets/animal/animal_v6.m4a', text: '我做鬼都唔會放過你！' },
+  { src: 'assets/animal/animal_v7.m4a', text: '頂你個肺！' },
+  { src: 'assets/animal/animal_v8.m4a', text: '你哋冇人性㗎，咁樣蝦我！' },
+  { src: 'assets/animal/animal_v9.m4a', text: '黐線㗎，黐線㗎！' },
 ];
 
 // 燒碳（救人版）：碳爐燒緊、窗閂住，Benny 越嚟越辛苦；玩家要開窗同熄碳爐救佢
@@ -1168,8 +1171,8 @@ function startAnimal() {
 }
 
 function onAnimalTap(x, y) {
-  const A = game.animal, st = roomStage('animal_room');
-  const u = clamp((x - st.x) / st.w, 0.04, 0.96), v = (y - st.y) / st.h;
+  const A = game.animal, st = animalStage();
+  const u = clamp((x - st.x) / st.w, st.u0 + 0.04, st.u1 - 0.04), v = (y - st.y) / st.h;
   const kind = pick(Object.keys(ANIMAL.kinds)), K = ANIMAL.kinds[kind];
   const band = K.where === 'wall' ? ANIMAL.wall : ANIMAL.floor;
   const c = { kind, u, v: clamp(v, band[0], band[1]), dir: Math.random() < 0.5 ? -1 : 1, vdir: Math.random() < 0.5 ? -1 : 1, t: 0, phase: Math.random(), nextTurn: rand(0.6, 1.6), stop: 0 };
@@ -1187,7 +1190,8 @@ function onAnimalTap(x, y) {
 
 function nextHop(b) {
   b.fromX = b.x; b.fromY = b.y;
-  b.toX = rand(0.14, 0.86); b.toY = rand(ANIMAL.floor[0] + 0.03, ANIMAL.floor[1]);
+  const st = animalStage();
+  b.toX = rand(Math.max(0.14, st.u0 + 0.08), Math.min(0.86, st.u1 - 0.08)); b.toY = rand(ANIMAL.floor[0] + 0.03, ANIMAL.floor[1]);
   b.hopT = 0; b.pose = b.pose % ANIMAL.jumpPoses + 1; b.flip = b.toX < b.fromX;
 }
 
@@ -1200,6 +1204,8 @@ function updateAnimal(dt) {
     if (b.hopT >= 1) { b.x = b.toX; b.y = b.toY; nextHop(b); }
     else { b.x = b.fromX + (b.toX - b.fromX) * b.hopT; b.y = b.fromY + (b.toY - b.fromY) * b.hopT; }
   }
+  // 動物撞到睇得到嘅房間邊就掉頭（手機裁咗左右）
+  const vis = animalStage(), lo = vis.u0 + 0.03, hi = vis.u1 - 0.03;
   for (const c of A.critters) {
     const K = ANIMAL.kinds[c.kind];
     c.t += dt;
@@ -1228,7 +1234,7 @@ function updateAnimal(dt) {
       if (c.stop > 0) c.stop -= dt; else c.u += c.dir * K.speed * dt;
       c.v += (c.baseV - c.v) * Math.min(1, dt * 4);
     }
-    if (c.u < 0.03 || c.u > 0.97) { c.dir *= -1; c.u = clamp(c.u, 0.03, 0.97); }
+    if (c.u < lo || c.u > hi) { c.dir *= -1; c.u = clamp(c.u, lo, hi); }
   }
 }
 
@@ -1254,7 +1260,7 @@ function drawCritter(c, st) {
 
 function drawAnimal() {
   const A = game.animal, b = A.benny;
-  const st = drawRoom('animal_room');
+  const st = drawRoom('animal_room', ANIMAL_FOCUS);
   // 牆上嘅蜘蛛先畫，之後地下嘅嘢同 Benny 按前後次序畫
   A.critters.filter((c) => ANIMAL.kinds[c.kind].where === 'wall').forEach((c) => drawCritter(c, st));
   const items = A.critters.filter((c) => ANIMAL.kinds[c.kind].where !== 'wall').map((c) => ({ z: c.v, draw: () => drawCritter(c, st) }));
@@ -1295,16 +1301,24 @@ function startBurn() {
   game.phase = 'burn';
 }
 
-// 房間相嘅位置：成間房一定睇晒（左右／上下多出嚟嘅位用模糊背景填）
-function roomStage(key) {
+// 房間相嘅位置。闊畫面：成間房睇晒（多出嚟嘅位用模糊背景填）。
+// 直度手機：成間房會變得好細，所以放大到大約畫面高度 45%，左右裁走啲，以 focusU 為中心；
+// u0／u1 係裁完之後睇到嘅房間範圍（比例），遊戲嘢要擺返喺呢個範圍入面
+const ROOM_MIN_H = 0.5;
+function roomStage(key, focusU = 0.5) {
   const im = IMG[key], iw = im ? im.width : 1536, ih = im ? im.height : 1024;
-  const s = Math.min(W / iw, H / ih), w = iw * s, h = ih * s;
-  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+  const contain = Math.min(W / iw, H / ih), cover = Math.max(W / iw, H / ih);
+  const s = Math.max(contain, Math.min(cover, (H * ROOM_MIN_H) / ih));
+  const w = iw * s, h = ih * s;
+  const x = clamp(W / 2 - focusU * w, W - w, 0) || 0;
+  return { x: w <= W ? (W - w) / 2 : x, y: (H - h) / 2, w, h, u0: Math.max(0, -x / w), u1: Math.min(1, (W - x) / w) };
 }
-const burnStage = () => roomStage('burn_room');
+const BURN_FOCUS = 0.64, ANIMAL_FOCUS = 0.5;
+const burnStage = () => roomStage('burn_room', BURN_FOCUS);
+const animalStage = () => roomStage('animal_room', ANIMAL_FOCUS);
 
-function drawRoom(key) {
-  const st = roomStage(key);
+function drawRoom(key, focusU) {
+  const st = roomStage(key, focusU);
   ctx.save(); if ('filter' in ctx) ctx.filter = 'blur(10px) brightness(.7)'; drawCover(key); ctx.restore();
   if (IMG[key]) ctx.drawImage(IMG[key], st.x, st.y, st.w, st.h);
   return st;
@@ -1315,7 +1329,8 @@ function burnRects() {
   const st = burnStage(), B = game.burn;
   const winKey = B.windowOpen ? 'burn_window_open' : 'burn_window_closed';
   const wh = BURN.window.h * st.h, ww = wh * aspect(winKey);
-  const wc = burnPt(st, BURN.window);
+  // 手機裁咗左邊：窗沿住後面嗰幅牆移入嚟，保持睇到
+  const wc = burnPt(st, { x: st.u0 > 0.05 ? Math.max(BURN.window.x, st.u0 + 0.17) : BURN.window.x, y: BURN.window.y - (st.u0 > 0.05 ? 0.05 : 0) });
   const fh = BURN.furnace.h * st.h, fw = fh * aspect('burn_furnace_on');
   const fc = burnPt(st, BURN.furnace);
   return {
@@ -1393,7 +1408,7 @@ function updateBurn(dt) {
 function drawBurn() {
   const B = game.burn, R = burnRects(), st = R.st;
   // 模糊背景填滿，再畫清楚嘅房間
-  drawRoom('burn_room');
+  drawRoom('burn_room', BURN_FOCUS);
 
   // 窗：開咗就見到外面藍天
   const W0 = R.window;
