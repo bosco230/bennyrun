@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -35,6 +35,13 @@
 <button id="btn-brothel" class="hidden">🏮 妓寨</button>
 <div id="brothel-hud" class="hidden">
   <button id="btn-brothel-back">放過佢啦</button>
+</div>
+
+<!-- 懲罰：飲茶（喺妓寨下面） -->
+<button id="btn-yum" class="hidden">🥢 飲茶</button>
+<div id="yum-hud" class="hidden">
+  <button id="btn-yum-serve">🥟 上菜</button>
+  <button id="btn-yum-spare">放過佢</button>
 </div>
 
 <!-- 懲罰：街坊對打（右上角） -->
@@ -143,6 +150,6 @@
   </div>
 </div>
 
-<script src="game.js?v=26"></script>
+<script src="game.js?v=29"></script>
 </body>
 </html>

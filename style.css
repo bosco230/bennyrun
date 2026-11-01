@@ -83,6 +83,27 @@ html, body {
   font-family: inherit; font-size: 20px; font-weight: 900; padding: 12px 30px; border-radius: 999px;
   box-shadow: 0 4px 0 rgba(74,59,82,.2);
 }
+#btn-yum {
+  position: fixed; left: max(12px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 258px);
+  z-index: 6; border: 0; cursor: pointer; font-family: inherit;
+  background: #c98a2b; color: #fff; font-size: 17px; font-weight: 900;
+  padding: 9px 16px; border-radius: 999px; box-shadow: 0 4px 0 #8f5f18;
+}
+#btn-yum:active { transform: translateY(3px); box-shadow: 0 1px 0 #8f5f18; }
+#yum-hud {
+  position: fixed; left: 0; right: 0; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px; padding: 0 12px; pointer-events: none;
+}
+#btn-yum-serve {
+  pointer-events: auto; border: 0; cursor: pointer; font-family: inherit; font-weight: 900; font-size: 22px;
+  background: #c98a2b; color: #fff; padding: 11px 28px; border-radius: 999px; box-shadow: 0 5px 0 #8f5f18; touch-action: manipulation;
+}
+#btn-yum-serve:active { transform: translateY(3px); box-shadow: 0 2px 0 #8f5f18; }
+#btn-yum-serve:disabled { opacity: .5; }
+#btn-yum-spare {
+  pointer-events: auto; border: 3px solid var(--blue); background: rgba(255,255,255,.94); color: var(--ink); cursor: pointer;
+  font-family: inherit; font-size: 16px; font-weight: 900; padding: 9px 18px; border-radius: 999px;
+}
 #btn-fight {
   position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 50px);
   z-index: 6; border: 0; cursor: pointer; font-family: inherit;

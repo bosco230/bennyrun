@@ -71,6 +71,20 @@ const IMG_SRC = {
   burn_furnace_off: 'assets/burn/furnace_off.png',
   burn_window_closed: 'assets/burn/window_closed.png',
   burn_window_open: 'assets/burn/window_open.png',
+  yum_bg: 'assets/yumcha/bg.jpg',
+  yum_chop: 'assets/yumcha/chop.png',
+  yum_eat1: 'assets/yumcha/eat1.png',
+  yum_eat2: 'assets/yumcha/eat2.png',
+  yum_eat3: 'assets/yumcha/eat3.png',
+  yum_eat4: 'assets/yumcha/eat4.png',
+  yum_eat5: 'assets/yumcha/eat5.png',
+  yum_eat6: 'assets/yumcha/eat6.png',
+  yum_food1: 'assets/yumcha/food1.png',
+  yum_food2: 'assets/yumcha/food2.png',
+  yum_food3: 'assets/yumcha/food3.png',
+  yum_food4: 'assets/yumcha/food4.png',
+  yum_food5: 'assets/yumcha/food5.png',
+  yum_food6: 'assets/yumcha/food6.png',
   fight_benny: 'assets/fight/benny.png',
   fight_benny_hit: 'assets/fight/benny_hit.png',
   fight_benny_shock: 'assets/fight/benny_shock.png',
@@ -223,7 +237,7 @@ const PHOTO_FACE = { cx: 153, cy: 268, rx: 100, ry: 128 };
 
 // 每個人物喺畫面嘅高度（× 畫面短邊）
 const SIZE = {
-  target: 0.26, woman: 0.27, dog: 0.17, opponent: 0.22,
+  target: 0.26, woman: 0.27, dog: 0.17, opponent: 0.27,
   bench: 0.34, chess_table: 0.42, bush: 0.24,
 };
 
@@ -281,7 +295,7 @@ window.addEventListener('resize', resize);
 // ============================================================
 const IMG = {};
 // 公園主關要用嘅圖先載入；懲罰相、IFC 天台、燒碳嘅圖等開始畫面出咗之後喺背景慢慢載，手機開得快啲
-const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_|fight_)/.test(k);
+const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_|fight_|yum_)/.test(k);
 function loadImages(keys, showProgress) {
   let done = 0;
   return Promise.all(keys.map((k) => new Promise((res) => {
@@ -353,13 +367,14 @@ const Sound = {
     this.animalVoices = ANIMAL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.brothelVoices = BROTHEL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.fightVoices = FIGHT_VOICES.map((src) => { const a = new Audio(src); a.preload = 'auto'; return a; });
-    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices, ...this.fightVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
+    this.yumVoices = YUM_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
+    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices, ...this.fightVoices, ...this.yumVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
   },
 
   setMuted(m) {
     this.muted = m; store.set('kdyz-muted', m ? '1' : '0');
     if (this.master) this.master.gain.value = m ? 0 : 1;
-    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || []), ...(this.fightVoices || [])].forEach((a) => { a.muted = m; });
+    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || []), ...(this.fightVoices || []), ...(this.yumVoices || [])].forEach((a) => { a.muted = m; });
     const v = document.getElementById('ifc-video'); if (v) v.muted = m;
     $('btn-mute').textContent = m ? '🔇' : '🔊';
   },
@@ -387,6 +402,16 @@ const Sound = {
   },
 
   // 蛇蟲鼠蟻語音：隨機、唔連續重複同一句，同一時間只播一段
+  // 飲茶語音：每上一碟隨機播一句（唔連續重複），新嗰句截斷舊嗰句
+  yumVoice() {
+    let i; do { i = Math.floor(Math.random() * YUM_VOICES.length); } while (i === this.lastYum && YUM_VOICES.length > 1);
+    this.lastYum = i;
+    (this.yumVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.yumVoices && this.yumVoices[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+    return YUM_VOICES[i].text;
+  },
+
   // 對打招式聲音：0 鑊氣波、1 衝天鑊鏟、2 旋風拖鞋
   fightVoice(i) {
     (this.fightVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
@@ -670,14 +695,23 @@ function collectDrawables() {
 
   for (const p of game.props) list.push({ z: p.y, draw: () => drawProp(p) });
 
-  // 捉棋伯伯（坐喺棋台右邊張石凳）
-  const tw = SIZE.chess_table * U * aspect('chess_table');
-  const opp = { x: chessP.x + (tw * 0.42) / W, y: chessP.y - (SIZE.chess_table * U * 0.14) / H };
+  // 捉棋伯伯：屁股坐喺棋台右邊石凳面（石凳面喺棋台圖 x 0.897、y 0.39；屁股喺伯伯圖 x 0.74、y 0.75）
+  const tH = SIZE.chess_table * U, tW = tH * aspect('chess_table');
+  const oH = SIZE.opponent * U, oW = oH * aspect('chess_opponent');
+  const oppX = px(chessP.x) + (0.897 - 0.5) * tW - (0.74 - 0.5) * oW;
+  const oppY = py(chessP.y) - (1 - 0.39) * tH + 0.25 * oH;
   list.push({
     z: chessP.y + 0.0005, draw: () => {
       const shake = game.opponent.angry > 0 ? Math.sin(game.t * 50) * 3 : 0;
-      game.opponent.rect = drawSprite('chess_opponent', px(opp.x) + shake, py(opp.y), SIZE.opponent * U, { rot: Math.sin(game.t * 1.2) * 0.015 });
-      game.opponent.head = { x: px(opp.x), y: py(opp.y) - SIZE.opponent * U };
+      game.opponent.rect = drawSprite('chess_opponent', oppX + shake, oppY, oH, { rot: Math.sin(game.t * 1.2) * 0.015 });
+      game.opponent.head = { x: oppX, y: oppY - oH };
+      // 棋盤邊喺佢前面：重畫棋台面遮住膝頭同手，等佢似傾身捉棋
+      const tr = chessP.rect;
+      if (tr && IMG.chess_table) {
+        ctx.save(); ctx.beginPath();
+        ctx.ellipse(tr.x + tr.w * 0.497, tr.y + tr.h * 0.27, tr.w * 0.33, tr.h * 0.235, 0, 0, Math.PI * 2);
+        ctx.clip(); ctx.drawImage(IMG.chess_table, tr.x, tr.y, tr.w, tr.h); ctx.restore();
+      }
     },
   });
 
@@ -1208,7 +1242,147 @@ function drawIfc() {
 
 // 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
 function punishButtons(on) {
-  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight'].forEach((id) => (on ? show(id) : hide(id)));
+  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight', 'btn-yum'].forEach((id) => (on ? show(id) : hide(id)));
+}
+
+// ============================================================
+// 飲茶：撳「上菜」，隨機一碟點心放上玻璃轉盤；Benny 見到就用筷子夾，每夾一碟飽一層。
+// 第六層（100%）之後清枱，由頭再嚟。唔限時，撳「放過佢」返回。位置用背景相比例座標
+// ============================================================
+const YUM = {
+  focusX: 0.51, chairX: 0.51, tableY: 0.69,   // 中間張椅同枱邊
+  maxFood: 6, chopTime: 0.7, fullHold: 3, score: 30,
+  eatKeys: ['yum_eat1', 'yum_eat2', 'yum_eat3', 'yum_eat4', 'yum_eat5', 'yum_eat6'],
+  eatPct: [10, 20, 30, 40, 50, 100],
+  foods: ['yum_food1', 'yum_food2', 'yum_food3', 'yum_food4', 'yum_food5', 'yum_food6'],
+  ax: { benny_idle: 0.5, yum_chop: 0.575 },   // 個頭喺圖片闊度幾多，預設 0.5
+};
+const YUM_VOICES = [
+  { src: 'assets/yumcha/yum_v1.m4a', text: '唔好再叫啦！' },
+  { src: 'assets/yumcha/yum_v2.m4a', text: '唔好嘥嘢！' },
+  { src: 'assets/yumcha/yum_v3.m4a', text: '我真係仲食唔到啦！' },
+  { src: 'assets/yumcha/yum_v4.m4a', text: '我真係好飽！' },
+  { src: 'assets/yumcha/yum_v5.m4a', text: '食晒佢，食晒佢！' },
+];
+
+function yumStage() {
+  const im = IMG.yum_bg, iw = im ? im.width : 1670, ih = im ? im.height : 941;
+  const s = Math.max(W / iw, H / ih), w = iw * s, h = ih * s;
+  const x = clamp(W / 2 - YUM.focusX * w, W - w, 0);
+  return { x, y: (H - h) / 2, w, h, u0: Math.max(0, -x / w), u1: Math.min(1, (W - x) / w) };
+}
+
+function yumShuffleSlots() {
+  const a = [0, 1, 2, 3, 4, 5];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function startYum() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false); show('yum-hud');
+  game.yum = { t: 0, foods: [], level: 0, state: 'sit', T: 0, total: 0, rounds: 0, bubble: null, slots: yumShuffleSlots(), lastKind: null };
+  game.phase = 'yum';
+}
+
+function endYum() {
+  const Y = game.yum, M = game.mini, add = Y.total * YUM.score;
+  game.phase = 'punish'; game.yum = null;
+  hide('yum-hud'); punishButtons(true);
+  (Sound.yumVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  if (add > 0) { M.score += add; M.yumFoods = (M.yumFoods || 0) + Y.total; floatText(`飲茶 +${add}`, W / 2, H * 0.4, '#c98a2b', 1.3); }
+}
+
+function yumServe() {
+  const Y = game && game.yum;
+  if (!Y || Y.state === 'full' || Y.foods.length >= YUM.maxFood) return;
+  let kind; do { kind = pick(YUM.foods); } while (kind === Y.lastKind);
+  Y.lastKind = kind;
+  Y.foods.push({ kind, slot: Y.slots[Y.foods.length], t: 0 });
+  Y.total++;
+  Sound.sfx('miss');
+  Y.bubble = { text: Sound.yumVoice(), t: 1.8 };
+}
+
+function updateYum(dt) {
+  const Y = game.yum;
+  Y.t += dt; Y.T += dt;
+  if (Y.bubble) { Y.bubble.t -= dt; if (Y.bubble.t <= 0) Y.bubble = null; }
+  for (const f of Y.foods) f.t += dt;
+  if (Y.state === 'chop') {
+    if (Y.T >= YUM.chopTime) {
+      Y.level++; Y.T = 0;
+      Y.state = Y.level >= YUM.eatKeys.length ? 'full' : 'eat';
+      Sound.sfx(Y.state === 'full' ? 'wrong' : 'catch');
+    }
+  } else if (Y.state === 'full') {
+    // 第六層：清枱，由頭再嚟
+    if (Y.T >= YUM.fullHold) { Y.foods = []; Y.level = 0; Y.state = 'sit'; Y.T = 0; Y.rounds++; Y.slots = yumShuffleSlots(); }
+  } else if (Y.foods.length > Y.level) { Y.state = 'chop'; Y.T = 0; }
+}
+
+function yumFoodSlots(st) {
+  const lo = Math.max(st.u0 + 0.02, 0.3), hi = Math.min(st.u1 - 0.02, 0.8);
+  const fw = Math.min(st.h * 0.15, (hi - lo) * st.w / 3 * 0.9), fh = (fw / 1.12) / st.h;
+  const out = [];
+  for (let i = 0; i < YUM.maxFood; i++) {
+    const u = lo + (hi - lo) * ((i % 3) + 0.5) / 3;
+    // 玻璃轉盤邊係弧形：越近兩邊，盤邊越低；後排腳底 = 盤邊 + 大半隻點心，令佢坐喺玻璃上
+    const back = 0.786 + (u - 0.545) * (u - 0.545) + fh * 0.75;
+    out.push({ u, v: i < 3 ? back : Math.min(back + fh * 0.62, 0.985), fw });
+  }
+  return out;
+}
+
+// 將背景相某範圍重畫一次，遮住 Benny 下半身，等佢坐喺枱後面
+function yumRepaint(st, path) {
+  ctx.save(); ctx.beginPath(); path(); ctx.clip();
+  ctx.drawImage(IMG.yum_bg, st.x, st.y, st.w, st.h);
+  ctx.restore();
+}
+
+function drawYum() {
+  const Y = game.yum, st = yumStage(), P = (u, v) => [st.x + u * st.w, st.y + v * st.h];
+  if (!IMG.yum_bg) { ctx.fillStyle = '#4a2f26'; ctx.fillRect(0, 0, W, H); return; }
+  ctx.drawImage(IMG.yum_bg, st.x, st.y, st.w, st.h);
+
+  // Benny
+  const key = Y.state === 'sit' ? 'benny_idle' : Y.state === 'chop' ? 'yum_chop' : YUM.eatKeys[Y.level - 1];
+  const tableY = st.y + YUM.tableY * st.h, h = Math.min(st.h * 0.55, W * 1.1);
+  const w = h * aspect(key), ax = YUM.ax[key] || 0.5;
+  const shake = Y.state === 'full' ? Math.sin(game.t * 40) * U * 0.004 : 0;
+  const bob = Y.state === 'chop' ? Math.sin(Y.T * 12) * h * 0.012 : Math.sin(Y.t * 2.5) * h * 0.004;
+  const fx = st.x + YUM.chairX * st.w + (0.5 - ax) * w + shake, fy = tableY + h * 0.38 + bob;
+  const r = drawSprite(key, fx, fy, h);
+
+  // 枱面、中間隻碗同筷子重畫喺 Benny 前面
+  yumRepaint(st, () => {
+    const us = [0.28, 0.34, 0.40, 0.46, 0.52, 0.58, 0.64, 0.70, 0.76];
+    us.forEach((u, i) => { const [x, y] = P(u, YUM.tableY + 0.37 * (u - 0.52) * (u - 0.52)); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    const [xr, yb] = P(0.76, 1), [xl] = P(0.28, 1);
+    ctx.lineTo(xr, yb); ctx.lineTo(xl, yb); ctx.closePath();
+  });
+  yumRepaint(st, () => { const [x, y] = P(0.509, 0.705); ctx.ellipse(x, y, st.w * 0.041, st.h * 0.04, 0, 0, Math.PI * 2); });
+  yumRepaint(st, () => { const [x, y] = P(0.424, 0.672); ctx.rect(x, y, st.w * 0.018, st.h * 0.03); });
+
+  // 轉盤上嘅點心（後排先畫）
+  const slots = yumFoodSlots(st);
+  Y.foods.slice().sort((a, b) => slots[a.slot].v - slots[b.slot].v).forEach((f) => {
+    const s = slots[f.slot], pop = Math.min(1, f.t / 0.18);
+    drawSprite(f.kind, st.x + s.u * st.w, st.y + s.v * st.h, (s.fw / aspect(f.kind)) * 1, { sx: 0.3 + 0.7 * pop, sy: 0.3 + 0.7 * pop });
+  });
+
+  if (Y.bubble) drawBubble(Y.bubble.text, r.x + r.w / 2, r.y, '#c98a2b');
+
+  // 飽度
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(16, U * 0.042);
+  ctx.save(); ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const pct = Y.level ? YUM.eatPct[Y.level - 1] : 0;
+  const s = `🥢 飽度 ${'●'.repeat(Y.level)}${'○'.repeat(YUM.maxFood - Y.level)} ${pct}%`;
+  ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.fillStyle = '#8a5a14'; ctx.fillText(s, W / 2, Math.max(78, U * 0.16));
+  ctx.restore();
+  $('btn-yum-serve').disabled = Y.state === 'full' || Y.foods.length >= YUM.maxFood;
 }
 
 // ============================================================
@@ -2023,7 +2197,7 @@ function showResult() {
   const best = parseInt(store.get('kdyz-best', '0'), 10) || 0;
   const isNew = total > best;
   if (isNew) store.set('kdyz-best', String(total));
-  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0, fightKOs: M.fightKOs || 0 };
+  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0, fightKOs: M.fightKOs || 0, yumFoods: M.yumFoods || 0 };
 
   $('res-main').textContent = fmt(game.score);
   $('res-time-label').textContent = `用時加分（${game.elapsed.toFixed(1)} 秒）`;
@@ -2039,7 +2213,7 @@ function showResult() {
 
 function shareText() {
   const r = lastResult;
-  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '') + (r.fightKOs ? `\n街坊對打 KO 咗佢 ${r.fightKOs} 次 🥊` : '');
+  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '') + (r.fightKOs ? `\n街坊對打 KO 咗佢 ${r.fightKOs} 次 🥊` : '') + (r.yumFoods ? `\n飲茶逼佢食咗 ${r.yumFoods} 碟點心 🥢` : '');
   return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈${ifc}\n你夠唔夠我快？`;
 }
 
@@ -2110,6 +2284,8 @@ function frame(now) {
     updateBrothel(dt);
   } else if (game.phase === 'fight' && game.fight) {
     updateFight(dt);
+  } else if (game.phase === 'yum' && game.yum) {
+    updateYum(dt);
   }
   render(dt);
 }
@@ -2132,6 +2308,8 @@ function render(dt) {
     drawBrothel();
   } else if (game.phase === 'fight' && game.fight) {
     drawFight();
+  } else if (game.phase === 'yum' && game.yum) {
+    drawYum();
   } else {
     drawPunish();
   }
@@ -2194,7 +2372,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 function pause(p) {
   if (!game || ['done'].includes(game.phase)) return;
-  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel', 'fight'].includes(game.phase);
+  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel', 'fight', 'yum'].includes(game.phase);
   const v = $('ifc-video'), videoOn = !$('ifc-video-layer').classList.contains('hidden');
   if (p && playing && !game.paused) {
     game.paused = true; Sound.suspend(); show('scr-pause');
@@ -2240,6 +2418,9 @@ $('btn-ifc').addEventListener('click', startIfc);
 $('btn-burn').addEventListener('click', afterImages(startBurn));
 $('btn-animal').addEventListener('click', afterImages(startAnimal));
 $('btn-animal-spare').addEventListener('click', () => { if (game && game.phase === 'animal') endAnimal(); });
+$('btn-yum').addEventListener('click', afterImages(startYum));
+$('btn-yum-serve').addEventListener('click', yumServe);
+$('btn-yum-spare').addEventListener('click', () => { if (game && game.phase === 'yum') endYum(); });
 $('btn-fight').addEventListener('click', afterImages(startFight));
 $('btn-fight-punch').addEventListener('click', fightPunch);
 $('btn-fight-wave').addEventListener('click', fightWave);
