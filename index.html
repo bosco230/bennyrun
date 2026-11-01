@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -35,6 +35,24 @@
 <button id="btn-brothel" class="hidden">🏮 妓寨</button>
 <div id="brothel-hud" class="hidden">
   <button id="btn-brothel-back">放過佢啦</button>
+</div>
+
+<!-- 懲罰：街坊對打（右上角） -->
+<button id="btn-fight" class="hidden">🥊 街坊對打</button>
+<div id="fight-hud" class="hidden">
+  <div class="fight-row">
+    <div class="fight-move">
+      <button id="btn-fight-left" aria-label="向左">◀</button>
+      <button id="btn-fight-right" aria-label="向右">▶</button>
+    </div>
+    <div class="fight-attacks">
+      <button id="btn-fight-punch">出拳</button>
+      <button id="btn-fight-wave">鑊氣波</button>
+      <button id="btn-fight-upper">衝天鑊鏟</button>
+      <button id="btn-fight-spin">旋風拖鞋</button>
+    </div>
+  </div>
+  <button id="btn-fight-spare">放過佢</button>
 </div>
 
 <!-- 蛇蟲鼠蟻：冇完結，撳「放過佢」返回 -->
@@ -125,6 +143,6 @@
   </div>
 </div>
 
-<script src="game.js?v=22"></script>
+<script src="game.js?v=26"></script>
 </body>
 </html>

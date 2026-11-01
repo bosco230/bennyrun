@@ -71,6 +71,18 @@ const IMG_SRC = {
   burn_furnace_off: 'assets/burn/furnace_off.png',
   burn_window_closed: 'assets/burn/window_closed.png',
   burn_window_open: 'assets/burn/window_open.png',
+  fight_benny: 'assets/fight/benny.png',
+  fight_benny_hit: 'assets/fight/benny_hit.png',
+  fight_benny_shock: 'assets/fight/benny_shock.png',
+  fight_rival: 'assets/fight/rival.png',
+  fight_rival_punch: 'assets/fight/rival_punch.png',
+  fight_rival_prepare: 'assets/fight/rival_prepare.png',
+  fight_rival_wave: 'assets/fight/rival_wave.png',
+  fight_rival_uppercut: 'assets/fight/rival_uppercut.png',
+  fight_rival_spin: 'assets/fight/rival_spin.png',
+  fight_wave: 'assets/fight/wave.png',
+  fight_bg_landscape: 'assets/fight/bg_landscape.jpg',
+  fight_bg_portrait: 'assets/fight/bg_portrait.jpg',
   brothel_bg: 'assets/brothel/bg.jpg',
   brothel_girl1: 'assets/brothel/girl1.png',
   brothel_girl2: 'assets/brothel/girl2.png',
@@ -269,7 +281,7 @@ window.addEventListener('resize', resize);
 // ============================================================
 const IMG = {};
 // 公園主關要用嘅圖先載入；懲罰相、IFC 天台、燒碳嘅圖等開始畫面出咗之後喺背景慢慢載，手機開得快啲
-const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_)/.test(k);
+const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_|fight_)/.test(k);
 function loadImages(keys, showProgress) {
   let done = 0;
   return Promise.all(keys.map((k) => new Promise((res) => {
@@ -340,13 +352,14 @@ const Sound = {
     this.burnVoices = BURN_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.animalVoices = ANIMAL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.brothelVoices = BROTHEL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
-    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
+    this.fightVoices = FIGHT_VOICES.map((src) => { const a = new Audio(src); a.preload = 'auto'; return a; });
+    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices, ...this.fightVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
   },
 
   setMuted(m) {
     this.muted = m; store.set('kdyz-muted', m ? '1' : '0');
     if (this.master) this.master.gain.value = m ? 0 : 1;
-    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || [])].forEach((a) => { a.muted = m; });
+    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || []), ...(this.fightVoices || [])].forEach((a) => { a.muted = m; });
     const v = document.getElementById('ifc-video'); if (v) v.muted = m;
     $('btn-mute').textContent = m ? '🔇' : '🔊';
   },
@@ -374,6 +387,13 @@ const Sound = {
   },
 
   // 蛇蟲鼠蟻語音：隨機、唔連續重複同一句，同一時間只播一段
+  // 對打招式聲音：0 鑊氣波、1 衝天鑊鏟、2 旋風拖鞋
+  fightVoice(i) {
+    (this.fightVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.fightVoices && this.fightVoices[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+  },
+
   // 妓寨語音：每撳一次女子都播一句（隨機、唔連續重複），新嗰句會截斷舊嗰句
   brothelVoice() {
     let i; do { i = Math.floor(Math.random() * BROTHEL_VOICES.length); } while (i === this.lastBrothel && BROTHEL_VOICES.length > 1);
@@ -1188,7 +1208,247 @@ function drawIfc() {
 
 // 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
 function punishButtons(on) {
-  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel'].forEach((id) => (on ? show(id) : hide(id)));
+  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight'].forEach((id) => (on ? show(id) : hide(id)));
+}
+
+// ============================================================
+// 街坊對打：玩家操控茶餐廳師傅強叔打 Benny；Benny 自己行同閃避。唔限時，撳「放過佢」返回
+// 位置 x 用畫面比例；強叔未有圖就用暫代圖形，新圖放入 assets/fight/ 就自動換
+// ============================================================
+const FIGHT = {
+  hp: 100, h: 0.36,           // 人物高度 × min(H, W × 1.5)
+  moveSpeed: 0.38, bennySpeed: 0.12, dodgeSpeed: 0.55, dodgeChance: 0.3,   // 每秒 × 畫面闊度
+  specialCd: 2, koTime: 2,
+  punch: { dmg: 8, score: 20, time: 0.3 },
+  wave: { dmg: 20, score: 100, prepare: 0.6, time: 0.4, speed: 0.9 },
+  upper: { dmg: 25, score: 120, dash: 1.4, time: 0.45 },
+  spin: { dmg: 18, score: 100, speed: 1.1, back: 0.6 },
+  koScore: 300,
+};
+const FIGHT_VOICES = ['assets/fight/rival_v1.mp3', 'assets/fight/rival_v2.mp3', 'assets/fight/rival_v3.mp3'];
+const fightUnit = () => Math.min(H, W * 1.5);
+const fightGround = () => Math.min(H * (W / H < 0.75 ? 0.77 : 0.82), H - 150);
+// 強叔每張圖（正方形）入面嘅位置：ax／ay 係兩腳中間同腳底，bh 係身高佔圖片幾多
+const RIVAL_POSE = {
+  fight_rival:          { ax: 0.56,  ay: 0.87, bh: 0.83 },
+  fight_rival_punch:    { ax: 0.59,  ay: 0.87, bh: 0.78 },
+  fight_rival_prepare:  { ax: 0.575, ay: 0.94, bh: 0.74 },
+  fight_rival_wave:     { ax: 0.745, ay: 0.82, bh: 0.655 },
+  fight_rival_uppercut: { ax: 0.47,  ay: 0.90, bh: 0.70 },
+  fight_rival_spin:     { ax: 0.575, ay: 0.82, bh: 0.70 },
+};
+
+function startFight() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false); show('fight-hud');
+  game.fight = {
+    t: 0, hp: FIGHT.hp, score: 0, kos: 0, cd: 0, move: 0, wave: null, koT: 0,
+    b: { x: 0.2, dest: 0.3, state: 'idle', T: 0, y: 0, vy: 0, dodge: 0, dodgeDir: 0, bob: 0, bubble: null },
+    r: { x: 0.8, state: 'idle', T: 0, y: 0, hit: false, home: 0.8, dir: -1 },
+  };
+  game.phase = 'fight';
+}
+
+function endFight() {
+  const F = game.fight, M = game.mini;
+  game.phase = 'punish'; game.fight = null;
+  hide('fight-hud'); punishButtons(true);
+  (Sound.fightVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  if (F.score > 0) { M.score += F.score; M.fightKOs = (M.fightKOs || 0) + F.kos; floatText(`街坊對打 +${F.score}`, W / 2, H * 0.4, '#7a4fd0', 1.3); }
+}
+
+// 出招前 Benny 有機會閃開
+function fightMaybeDodge(F) {
+  if (F.b.state !== 'idle' || Math.random() > FIGHT.dodgeChance) return;
+  F.b.dodge = 0.4; F.b.dodgeDir = F.b.x < F.r.x ? -1 : 1;
+}
+const fightReady = (F) => F && F.r.state === 'idle' && F.b.state !== 'ko';
+
+function fightPunch() {
+  const F = game && game.fight;
+  if (!fightReady(F)) return;
+  F.r.state = 'punch'; F.r.T = 0; F.r.hit = false;
+  fightMaybeDodge(F); Sound.sfx('bat');
+}
+function fightSpecialStart(F, voice) {
+  F.cd = FIGHT.specialCd; F.r.T = 0; F.r.hit = false;
+  Sound.fightVoice(voice); fightMaybeDodge(F);
+}
+function fightWave() {
+  const F = game && game.fight;
+  if (!fightReady(F) || F.cd > 0) return;
+  F.r.state = 'prepare'; fightSpecialStart(F, 0);
+}
+function fightUppercut() {
+  const F = game && game.fight;
+  if (!fightReady(F) || F.cd > 0) return;
+  F.r.state = 'dash'; fightSpecialStart(F, 1);
+}
+function fightSpin() {
+  const F = game && game.fight;
+  if (!fightReady(F) || F.cd > 0) return;
+  F.r.state = 'spin'; F.r.home = F.r.x;
+  // 由右至左橫過畫面；已經喺最左就由左至右
+  F.r.dir = F.r.x > 0.25 ? -1 : 1;
+  fightSpecialStart(F, 2);
+}
+
+function fightHit(atk, kind) {
+  const F = game.fight, b = F.b;
+  if (b.state === 'ko') return;
+  F.hp = Math.max(0, F.hp - atk.dmg); F.score += atk.score;
+  const fx = b.x * W, fy = fightGround() - fightUnit() * FIGHT.h * 0.6;
+  addFx({ img: 'fx_pa', word: kind === 'shock' ? '轟！' : '啪！', x: fx, y: fy, size: U * 0.2, life: 0.35, grow: true, rot: rand(-0.3, 0.3) });
+  floatText(`+${atk.score}`, fx, fy - U * 0.06, '#e86a8c', 0.9);
+  game.shake = Math.max(game.shake, 0.15);
+  const said = Sound.voice();
+  if (said) b.bubble = { text: said, t: 1.2 };
+  if (kind === 'air') { b.state = 'air'; b.vy = -1.5; b.y = 0; }
+  else { b.state = kind === 'shock' ? 'shock' : 'hit'; b.T = kind === 'shock' ? 0.55 : 0.35; }
+  if (F.hp <= 0) {
+    F.score += FIGHT.koScore; F.kos++; F.koT = FIGHT.koTime;
+    if (kind !== 'air') { b.state = 'ko'; b.T = FIGHT.koTime; }
+    floatText(`KO！+${FIGHT.koScore}`, W / 2, H * 0.3, '#e8404f', 1.6);
+    Sound.sfx('level');
+  }
+}
+
+function updateFight(dt) {
+  const F = game.fight, b = F.b, r = F.r, u = fightUnit();
+  F.t += dt; F.cd = Math.max(0, F.cd - dt);
+  if (b.bubble) { b.bubble.t -= dt; if (b.bubble.t <= 0) b.bubble = null; }
+  const reach = (u * FIGHT.h * 0.5) / W, close = () => Math.abs(b.x - r.x) < reach;
+
+  // 強叔
+  if (r.state === 'idle' && F.move) r.x = clamp(r.x + F.move * FIGHT.moveSpeed * dt, 0.08, 0.92);
+  r.T += dt;
+  if (r.state === 'punch') {
+    // 出拳圖隻手好長，判定距離 = 手臂長度 + Benny 半個身闊
+    if (!r.hit && r.T > 0.12) { r.hit = true; if (Math.abs(b.x - r.x) * W < u * FIGHT.h * 0.9) fightHit(FIGHT.punch, 'hit'); }
+    if (r.T > FIGHT.punch.time) r.state = 'idle';
+  } else if (r.state === 'prepare') {
+    if (r.T > FIGHT.wave.prepare) {
+      r.state = 'wave'; r.T = 0;
+      F.wave = { x: r.x + (b.x < r.x ? -0.08 : 0.08), dir: b.x < r.x ? -1 : 1, t: 0 };
+      Sound.sfx('flame');
+    }
+  } else if (r.state === 'wave') {
+    if (r.T > FIGHT.wave.time) r.state = 'idle';
+  } else if (r.state === 'dash') {
+    const d = b.x - r.x;
+    r.x += Math.sign(d) * Math.min(Math.abs(d), FIGHT.upper.dash * dt);
+    if (close() || r.T > 0.6) { r.state = 'upper'; r.T = 0; r.hit = false; Sound.sfx('mace'); }
+  } else if (r.state === 'upper') {
+    r.y = Math.sin(Math.min(1, r.T / FIGHT.upper.time) * Math.PI) * u * 0.22;
+    if (!r.hit && r.T > 0.1) { r.hit = true; if (close()) fightHit(FIGHT.upper, 'air'); }
+    if (r.T > FIGHT.upper.time) { r.state = 'idle'; r.y = 0; }
+  } else if (r.state === 'spin') {
+    r.x += r.dir * FIGHT.spin.speed * dt;
+    if (!r.hit && close()) { r.hit = true; fightHit(FIGHT.spin, 'hit'); Sound.sfx('gun'); }
+    if (r.x < 0.08 || r.x > 0.92) { r.x = clamp(r.x, 0.08, 0.92); r.state = 'back'; }
+  } else if (r.state === 'back') {
+    const d = r.home - r.x;
+    r.x += Math.sign(d) * Math.min(Math.abs(d), FIGHT.spin.back * dt);
+    if (Math.abs(d) < 0.005) r.state = 'idle';
+  }
+
+  // 鑊氣波
+  if (F.wave) {
+    F.wave.x += F.wave.dir * FIGHT.wave.speed * dt; F.wave.t += dt;
+    if (Math.abs(F.wave.x - b.x) < reach * 0.7 && b.state !== 'ko') { F.wave = null; fightHit(FIGHT.wave, 'shock'); }
+    else if (F.wave.x < -0.1 || F.wave.x > 1.1) F.wave = null;
+  }
+
+  // Benny
+  b.bob += dt;
+  if (F.koT > 0) { F.koT -= dt; if (F.koT <= 0) { F.hp = FIGHT.hp; b.state = 'idle'; b.y = 0; b.bubble = { text: '仲嚟？', t: 1 }; } }
+  if (b.state === 'air') {
+    b.vy += 4 * dt; b.y += b.vy * dt;
+    if (b.y >= 0) { b.y = 0; b.state = F.hp <= 0 ? 'ko' : 'hit'; b.T = F.hp <= 0 ? F.koT : 0.4; Sound.sfx('bat'); }
+  } else if (b.state === 'hit' || b.state === 'shock') {
+    b.T -= dt; if (b.T <= 0) b.state = F.hp <= 0 ? 'ko' : 'idle';
+  } else if (b.state === 'idle') {
+    if (b.dodge > 0) {
+      b.dodge -= dt; b.x = clamp(b.x + b.dodgeDir * FIGHT.dodgeSpeed * dt, 0.08, 0.92);
+    } else {
+      const d = b.dest - b.x;
+      if (Math.abs(d) < 0.01) b.dest = rand(0.08, 0.92);
+      else b.x += Math.sign(d) * FIGHT.bennySpeed * dt;
+    }
+  }
+}
+
+// 強叔暫代圖形：未有 assets/fight/rival*.png 先用
+function drawRivalPlaceholder(x, y, h, state, flip) {
+  const w = h * 0.55, s = flip ? -1 : 1;
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, 1); if (state === 'spin') ctx.rotate(game.t * 25);
+  ctx.lineWidth = 3; ctx.strokeStyle = '#222';
+  const box = (c, a, b, cw, ch) => { ctx.fillStyle = c; ctx.fillRect(a, b, cw, ch); ctx.strokeRect(a, b, cw, ch); };
+  box('#8a8f98', -w * 0.3, -h * 0.34, w * 0.25, h * 0.34); box('#8a8f98', w * 0.05, -h * 0.34, w * 0.25, h * 0.34);
+  box('#f4f1e6', -w * 0.42, -h * 0.72, w * 0.84, h * 0.4); box('#d9c8a0', -w * 0.3, -h * 0.58, w * 0.6, h * 0.3);
+  ctx.fillStyle = '#f1c9a0'; ctx.beginPath(); ctx.arc(0, -h * 0.84, h * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // 手：向左（面向 Benny）
+  const armUp = state === 'prepare', armOut = ['punch', 'wave', 'spin'].includes(state);
+  ctx.fillStyle = '#f1c9a0';
+  if (armUp) { ctx.fillRect(-w * 0.5, -h * 1.05, w * 0.16, h * 0.4); ctx.fillRect(w * 0.34, -h * 1.05, w * 0.16, h * 0.4); }
+  else if (state === 'upper') ctx.fillRect(-w * 0.55, -h * 1.1, w * 0.18, h * 0.5);
+  else if (armOut) ctx.fillRect(-w * 1.05, -h * 0.68, w * 0.7, h * 0.12);
+  else ctx.fillRect(-w * 0.55, -h * 0.68, w * 0.16, h * 0.34);
+  ctx.restore();
+  ctx.save(); ctx.font = `900 ${Math.max(12, h * 0.08)}px ${getComputedStyle(document.body).fontFamily}`; ctx.textAlign = 'center';
+  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeText('強叔', x, y + h * 0.1); ctx.fillStyle = '#333'; ctx.fillText('強叔', x, y + h * 0.1); ctx.restore();
+}
+
+function drawFight() {
+  const F = game.fight, b = F.b, r = F.r, u = fightUnit(), g = fightGround(), h = u * FIGHT.h;
+  // 背景：直度用直身，闊度用闊身；未有圖就用公園
+  const bgKey = W / H < 0.75 ? 'fight_bg_portrait' : 'fight_bg_landscape';
+  const alt = bgKey === 'fight_bg_portrait' ? 'fight_bg_landscape' : 'fight_bg_portrait';
+  drawCover(IMG[bgKey] ? bgKey : IMG[alt] ? alt : layout.bg);
+
+  // Benny（圖片面向右，對手喺左邊就反轉）
+  const bFlip = r.x < b.x;
+  let bKey = 'fight_benny', bH = h, bx = b.x * W, by = g + b.y * h, bOpt = { flip: bFlip };
+  if (b.state === 'hit' || b.state === 'ko' || b.state === 'air') { bKey = 'fight_benny_hit'; bH = h * 0.75; }
+  else if (b.state === 'shock') { bKey = 'fight_benny_shock'; bH = h * 1.1; bx += Math.sin(game.t * 60) * U * 0.006; }
+  else { by -= Math.abs(Math.sin(b.bob * 8)) * u * 0.008; }
+  const br = drawSprite(bKey, bx, by, bH, bOpt);
+
+  // 強叔（圖片面向左，Benny 喺右邊就反轉）
+  const rFlip = r.state === 'spin' || r.state === 'back' ? r.dir > 0 : b.x > r.x;
+  const key = { punch: 'fight_rival_punch', prepare: 'fight_rival_prepare', wave: 'fight_rival_wave', dash: 'fight_rival', upper: 'fight_rival_uppercut', spin: 'fight_rival_spin' }[r.state] || 'fight_rival';
+  const rx = r.x * W, ry = g - r.y;
+  const useKey = IMG[key] ? key : 'fight_rival';
+  if (IMG[useKey]) {
+    // 用腳底位置對齊，出招轉圖時個人唔會跳位
+    const P = RIVAL_POSE[useKey], S = h / P.bh, off = (0.5 - P.ax) * S;
+    drawSprite(useKey, rx + (rFlip ? -off : off), ry + (1 - P.ay) * S, S, { flip: rFlip, rot: r.state === 'spin' ? Math.sin(game.t * 30) * 0.08 : 0 });
+  } else drawRivalPlaceholder(rx, ry, h, r.state, rFlip);
+
+  // 鑊氣波
+  if (F.wave) {
+    const wx = F.wave.x * W, wy = g - h * 0.55, s = h * 0.6;
+    if (IMG.fight_wave) drawSprite('fight_wave', wx, wy + s / 2, s, { flip: F.wave.dir > 0 });
+    else {
+      const gr = ctx.createRadialGradient(wx, wy, s * 0.05, wx, wy, s * 0.5);
+      gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.5, '#ffb030'); gr.addColorStop(1, 'rgba(232,80,20,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(wx, wy, s * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (b.bubble) drawBubble(b.bubble.text, br.x + br.w / 2, br.y, '#e86a8c');
+
+  // 血條同分數
+  const bw = Math.min(W * 0.62, 420), bx0 = (W - bw) / 2, by0 = Math.max(100, U * 0.16), bh0 = Math.max(14, U * 0.024);
+  ctx.save();
+  ctx.fillStyle = 'rgba(40,20,30,.75)'; roundRect(bx0 - 3, by0 - 3, bw + 6, bh0 + 6, 8); ctx.fill();
+  ctx.fillStyle = F.hp > 30 ? '#ffd45c' : '#e8404f'; ctx.fillRect(bx0, by0, bw * F.hp / FIGHT.hp, bh0);
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(15, U * 0.036);
+  ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const s = `🥊 Benny ・ ${fmt(F.score)} 分 ・ KO ${F.kos} 次`;
+  ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, by0 + bh0 + fs);
+  ctx.fillStyle = '#533396'; ctx.fillText(s, W / 2, by0 + bh0 + fs);
+  ctx.restore();
+  ['btn-fight-wave', 'btn-fight-upper', 'btn-fight-spin'].forEach((id) => { $(id).disabled = F.cd > 0; });
 }
 
 // ============================================================
@@ -1763,7 +2023,7 @@ function showResult() {
   const best = parseInt(store.get('kdyz-best', '0'), 10) || 0;
   const isNew = total > best;
   if (isNew) store.set('kdyz-best', String(total));
-  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0 };
+  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0, fightKOs: M.fightKOs || 0 };
 
   $('res-main').textContent = fmt(game.score);
   $('res-time-label').textContent = `用時加分（${game.elapsed.toFixed(1)} 秒）`;
@@ -1779,7 +2039,7 @@ function showResult() {
 
 function shareText() {
   const r = lastResult;
-  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '');
+  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '') + (r.fightKOs ? `\n街坊對打 KO 咗佢 ${r.fightKOs} 次 🥊` : '');
   return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈${ifc}\n你夠唔夠我快？`;
 }
 
@@ -1848,6 +2108,8 @@ function frame(now) {
     updateAnimal(dt);
   } else if (game.phase === 'brothel' && game.brothel) {
     updateBrothel(dt);
+  } else if (game.phase === 'fight' && game.fight) {
+    updateFight(dt);
   }
   render(dt);
 }
@@ -1868,6 +2130,8 @@ function render(dt) {
     drawAnimal();
   } else if (game.phase === 'brothel') {
     drawBrothel();
+  } else if (game.phase === 'fight' && game.fight) {
+    drawFight();
   } else {
     drawPunish();
   }
@@ -1930,7 +2194,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 function pause(p) {
   if (!game || ['done'].includes(game.phase)) return;
-  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel'].includes(game.phase);
+  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel', 'fight'].includes(game.phase);
   const v = $('ifc-video'), videoOn = !$('ifc-video-layer').classList.contains('hidden');
   if (p && playing && !game.paused) {
     game.paused = true; Sound.suspend(); show('scr-pause');
@@ -1943,6 +2207,13 @@ function pause(p) {
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(true); });
 document.addEventListener('keydown', (e) => {
   if (game && game.phase === 'ifc' && (e.key === 'ArrowLeft' || e.key === ' ')) { e.preventDefault(); ifcPush(); }
+  if (game && game.phase === 'fight' && game.fight) {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); game.fight.move = -1; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); game.fight.move = 1; }
+  }
+});
+document.addEventListener('keyup', (e) => {
+  if (game && game.fight && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) game.fight.move = 0;
 });
 
 // ============================================================
@@ -1969,6 +2240,17 @@ $('btn-ifc').addEventListener('click', startIfc);
 $('btn-burn').addEventListener('click', afterImages(startBurn));
 $('btn-animal').addEventListener('click', afterImages(startAnimal));
 $('btn-animal-spare').addEventListener('click', () => { if (game && game.phase === 'animal') endAnimal(); });
+$('btn-fight').addEventListener('click', afterImages(startFight));
+$('btn-fight-punch').addEventListener('click', fightPunch);
+$('btn-fight-wave').addEventListener('click', fightWave);
+$('btn-fight-upper').addEventListener('click', fightUppercut);
+$('btn-fight-spin').addEventListener('click', fightSpin);
+$('btn-fight-spare').addEventListener('click', () => { if (game && game.phase === 'fight') endFight(); });
+[['btn-fight-left', -1], ['btn-fight-right', 1]].forEach(([id, dir]) => {
+  const b = $(id), set = (v) => { if (game && game.fight) game.fight.move = v; };
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); set(dir); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => b.addEventListener(ev, () => set(0)));
+});
 $('btn-brothel').addEventListener('click', afterImages(startBrothel));
 $('btn-brothel-back').addEventListener('click', () => { if (game && game.phase === 'brothel') endBrothel(); });
 $('btn-push').addEventListener('click', ifcPush);

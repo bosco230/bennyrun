@@ -90,3 +90,31 @@ blood, gore, realistic violence, scary, horror, text watermark, extra limbs, def
 
 ## audio/sfx/（之後用程式合成或免費音效，暫時唔使生成）
 打擊聲（四款武器各一）、狗吠、打錯人、捉到、結算。
+
+
+---
+
+# 街坊對打（`assets/fight/`，原創角色，唔好提 Ken 或者 Street Fighter）
+
+先整 `rival.png`，之後每張都上載佢做參考圖，角色先會一致。角色同特效用純白背景，唔好用灰白格仔；下載後改名放入 `assets/fight/`。
+
+### 風格前綴（角色同特效）
+```
+16-bit retro arcade pixel art, bold black outlines, limited vivid colors, clean crisp pixels, full body, side view facing left, original character, isolated on plain white background, no text,
+```
+
+| 檔名 | 比例 | Prompt（接喺前綴後面）|
+|---|---|---|
+| `rival.png` | 1:1 | a stout bald middle-aged Hong Kong cha chaan teng cook named Uncle Keung, thick moustache, white singlet, stained beige apron, grey shorts, plastic slippers, holding a metal wok spatula in one hand, relaxed fighting stance |
+| `rival_punch.png` | 1:1 | same cook, lunging forward throwing a big straight punch with his free fist, angry shouting face, apron flapping |
+| `rival_prepare.png` | 1:1 | same cook, wide stance, lifting a black iron wok above his head with both hands, orange flames starting to gather in the wok, eyes closed in concentration |
+| `rival_wave.png` | 1:1 | same cook, thrusting the iron wok forward with both hands, mouth wide open shouting, flames bursting out of the wok towards the left |
+| `rival_uppercut.png` | 1:1 | same cook, jumping upward off the ground, swinging the wok spatula upward in a rising uppercut, one knee raised, apron and flames trailing below him |
+| `rival_spin.png` | 1:1 | same cook, spinning sideways in the air like a top, one leg stretched out with a plastic slipper leading the kick, motion swirl lines of steam around him |
+| `wave.png` | 1:1 | a blob of orange and yellow wok flame with sparks and small flying bean sprouts, moving left, no character |
+
+### 背景（唔使加前綴）
+| 檔名 | 比例 | Prompt |
+|---|---|---|
+| `bg_landscape.jpg` | 16:9 | 16-bit retro arcade pixel art background, side view fighting stage on an old Hong Kong street at dusk, cha chaan teng shopfront, stacked neon signs, tong lau buildings, red taxi parked far behind, flat paved pavement filling the bottom third as the ground, vivid colors, no people, no text, no logos |
+| `bg_portrait.jpg` | 9:16 | same old Hong Kong street at dusk in pixel art, tall vertical composition, neon signs stacked high above, flat paved pavement filling the bottom third, no people, no text, no logos |

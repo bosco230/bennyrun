@@ -83,6 +83,37 @@ html, body {
   font-family: inherit; font-size: 20px; font-weight: 900; padding: 12px 30px; border-radius: 999px;
   box-shadow: 0 4px 0 rgba(74,59,82,.2);
 }
+#btn-fight {
+  position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 50px);
+  z-index: 6; border: 0; cursor: pointer; font-family: inherit;
+  background: #7a4fd0; color: #fff; font-size: 17px; font-weight: 900;
+  padding: 9px 16px; border-radius: 999px; box-shadow: 0 4px 0 #533396;
+}
+#btn-fight:active { transform: translateY(3px); box-shadow: 0 1px 0 #533396; }
+#fight-hud {
+  position: fixed; left: 0; right: 0; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 10px; pointer-events: none;
+}
+#fight-hud button { pointer-events: auto; cursor: pointer; font-family: inherit; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.fight-row { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 720px; gap: 10px; }
+.fight-move { display: flex; gap: 8px; }
+.fight-move button {
+  width: 58px; height: 58px; border: 0; border-radius: 16px; background: rgba(255,255,255,.92); color: var(--ink);
+  font-size: 24px; font-weight: 900; box-shadow: 0 4px 0 rgba(74,59,82,.35);
+}
+.fight-move button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(74,59,82,.35); }
+.fight-attacks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fight-attacks button {
+  border: 0; border-radius: 12px; padding: 9px 10px; min-width: 84px; color: #fff; font-size: 15px; font-weight: 900;
+  background: #e0763a; box-shadow: 0 3px 0 #a9522a;
+}
+.fight-attacks button:active { transform: translateY(2px); box-shadow: 0 1px 0 #a9522a; }
+.fight-attacks button:disabled { opacity: .5; }
+#btn-fight-punch { background: #c8324f; box-shadow: 0 3px 0 #8e2138; }
+#btn-fight-spare {
+  border: 2px solid var(--blue); background: rgba(255,255,255,.94); color: var(--ink);
+  font-size: 15px; font-weight: 900; padding: 6px 22px; border-radius: 999px;
+}
 #animal-hud {
   position: fixed; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 6;
   display: flex; justify-content: center; pointer-events: none;
