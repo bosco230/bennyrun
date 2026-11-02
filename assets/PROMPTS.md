@@ -118,3 +118,26 @@ blood, gore, realistic violence, scary, horror, text watermark, extra limbs, def
 |---|---|---|
 | `bg_landscape.jpg` | 16:9 | 16-bit retro arcade pixel art background, side view fighting stage on an old Hong Kong street at dusk, cha chaan teng shopfront, stacked neon signs, tong lau buildings, red taxi parked far behind, flat paved pavement filling the bottom third as the ground, vivid colors, no people, no text, no logos |
 | `bg_portrait.jpg` | 9:16 | same old Hong Kong street at dusk in pixel art, tall vertical composition, neon signs stacked high above, flat paved pavement filling the bottom third, no people, no text, no logos |
+
+
+---
+
+# 街坊對打：老闆娘（`assets/fight/boss*.png`，原創角色）
+
+原創茶餐廳老闆娘，唔好提 Chun-Li 或者 Street Fighter，亦唔好用藍色旗袍、牛角髻、白色長靴同釘手鈪。先整 `boss.png`，之後每張上載佢做參考圖。用純白背景，比例 1:1，面向左。
+
+### 風格前綴
+```
+16-bit retro arcade pixel art, bold black outlines, limited vivid colors, clean crisp pixels, full body, side view facing left, original character, isolated on plain white background, no text,
+```
+
+| 檔名 | Prompt（接喺前綴後面）|
+|---|---|
+| `boss.png` | a lively middle-aged Hong Kong cha chaan teng lady boss named Boss Lady, short curly permed black hair, red lipstick, pink floral short-sleeve blouse, cream apron with a pocket of order slips, dark capri pants, plastic slippers, gold bangle, light on her feet, relaxed martial arts stance |
+| `boss_punch.png` | same lady boss, lunging forward with a fast straight punch, shouting, apron flapping |
+| `boss_kick.png` | same lady boss, standing on one leg, the other leg stretched out in a high side kick leading with a plastic slipper |
+| `boss_multi.png` | same lady boss, balancing on one leg throwing a flurry of rapid kicks, several blurred motion copies of her leg fanning out in front of her |
+| `boss_spin.png` | same lady boss, spinning sideways in the air with one leg extended, apron and curly hair swirling, white motion swirl lines around her |
+| `boss_prepare.png` | same lady boss, wide stance, both palms drawn back at her hip gathering a small glowing pink ball of energy, eyes narrowed |
+| `boss_wave.png` | same lady boss, thrusting both open palms forward towards the left, pink energy bursting from her hands, shouting |
+| `boss_qi.png` | a glowing round ball of pink and white energy with small floating order slips, moving left, no character |

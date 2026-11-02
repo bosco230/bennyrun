@@ -85,6 +85,14 @@ const IMG_SRC = {
   yum_food4: 'assets/yumcha/food4.png',
   yum_food5: 'assets/yumcha/food5.png',
   yum_food6: 'assets/yumcha/food6.png',
+  fight_boss: 'assets/fight/boss.png',
+  fight_boss_punch: 'assets/fight/boss_punch.png',
+  fight_boss_kick: 'assets/fight/boss_kick.png',
+  fight_boss_prepare: 'assets/fight/boss_prepare.png',
+  fight_boss_wave: 'assets/fight/boss_wave.png',
+  fight_boss_multi: 'assets/fight/boss_multi.png',
+  fight_boss_spin: 'assets/fight/boss_spin.png',
+  fight_boss_qi: 'assets/fight/boss_qi.png',
   fight_benny: 'assets/fight/benny.png',
   fight_benny_hit: 'assets/fight/benny_hit.png',
   fight_benny_shock: 'assets/fight/benny_shock.png',
@@ -1397,9 +1405,18 @@ const FIGHT = {
   wave: { dmg: 20, score: 100, prepare: 0.6, time: 0.4, speed: 0.9 },
   upper: { dmg: 25, score: 120, dash: 1.4, time: 0.45 },
   spin: { dmg: 18, score: 100, speed: 1.1, back: 0.6 },
+  kick: { dmg: 11, score: 30, time: 0.38 },
+  multi: { hits: 5, dmg: 5, score: 30, time: 1 },   // 老闆娘連環腳：連踢五下
   koScore: 300,
 };
-const FIGHT_VOICES = ['assets/fight/rival_v1.mp3', 'assets/fight/rival_v2.mp3', 'assets/fight/rival_v3.mp3'];
+// 0–2 強叔；3、4 老闆娘連環腳；5 老闆娘旋風腳（氣功掌暫時未有聲音檔，用合成音效）
+const FIGHT_VOICES = ['assets/fight/rival_v1.mp3', 'assets/fight/rival_v2.mp3', 'assets/fight/rival_v3.mp3', 'assets/fight/boss_v1.mp3', 'assets/fight/boss_v2.mp3', 'assets/fight/boss_v3.mp3'];
+// 對手：每個招式狀態對應邊張圖；老闆娘圖未有就用暫代圖形
+const FIGHTERS = {
+  keung: { name: '強叔', base: 'fight_rival', keys: { punch: 'fight_rival_punch', prepare: 'fight_rival_prepare', wave: 'fight_rival_wave', upper: 'fight_rival_uppercut', spin: 'fight_rival_spin' } },
+  boss: { name: '老闆娘', base: 'fight_boss', keys: { punch: 'fight_boss_punch', kick: 'fight_boss_kick', prepare: 'fight_boss_prepare', wave: 'fight_boss_wave', multi: 'fight_boss_multi', spin: 'fight_boss_spin' } },
+};
+const DEFAULT_POSE = { ax: 0.5, ay: 0.9, bh: 0.8 };
 const fightUnit = () => Math.min(H, W * 1.5);
 const fightGround = () => Math.min(H * (W / H < 0.75 ? 0.77 : 0.82), H - 150);
 // 強叔每張圖（正方形）入面嘅位置：ax／ay 係兩腳中間同腳底，bh 係身高佔圖片幾多
@@ -1410,17 +1427,49 @@ const RIVAL_POSE = {
   fight_rival_wave:     { ax: 0.745, ay: 0.82, bh: 0.655 },
   fight_rival_uppercut: { ax: 0.47,  ay: 0.90, bh: 0.70 },
   fight_rival_spin:     { ax: 0.575, ay: 0.82, bh: 0.70 },
+  fight_boss:           { ax: 0.60,  ay: 0.95, bh: 0.90 },
+  fight_boss_punch:     { ax: 0.65,  ay: 0.955, bh: 0.98 },
+  fight_boss_kick:      { ax: 0.61,  ay: 0.955, bh: 0.84 },
+  fight_boss_multi:     { ax: 0.675, ay: 0.915, bh: 0.74 },
+  fight_boss_spin:      { ax: 0.55,  ay: 0.89, bh: 0.84 },
+  fight_boss_prepare:   { ax: 0.525, ay: 0.945, bh: 0.92 },
+  fight_boss_wave:      { ax: 0.68,  ay: 0.915, bh: 0.86 },
 };
 
 function startFight() {
   if (!game || game.phase !== 'punish' || game.paused) return;
   punishButtons(false); show('fight-hud');
   game.fight = {
-    t: 0, hp: FIGHT.hp, score: 0, kos: 0, cd: 0, move: 0, wave: null, koT: 0,
+    who: 'keung', t: 0, hp: FIGHT.hp, score: 0, kos: 0, cd: 0, move: 0, wave: null, koT: 0,
     b: { x: 0.2, dest: 0.3, state: 'idle', T: 0, y: 0, vy: 0, dodge: 0, dodgeDir: 0, bob: 0, bubble: null },
-    r: { x: 0.8, state: 'idle', T: 0, y: 0, hit: false, home: 0.8, dir: -1 },
+    r: { x: 0.8, state: 'idle', T: 0, y: 0, hit: false, home: 0.8, dir: -1, hits: 0 },
   };
   game.phase = 'fight';
+  fightApplyButtons();
+}
+
+// 招式掣跟對手：強叔四招，老闆娘五招
+function fightApplyButtons() {
+  const boss = game.fight.who === 'boss';
+  $('btn-fight-kick').classList.toggle('hidden', !boss);
+  $('fight-attacks').classList.toggle('five', boss);
+  $('btn-fight-wave').textContent = boss ? '氣功掌' : '鑊氣波';
+  $('btn-fight-upper').textContent = boss ? '連環腳' : '衝天鑊鏟';
+  $('btn-fight-spin').textContent = boss ? '旋風腳' : '旋風拖鞋';
+}
+
+// 換人再打：換對手，血條同位置重置，分數同 KO 保留
+function fightSwap() {
+  const F = game && game.fight;
+  if (!F) return;
+  F.who = F.who === 'keung' ? 'boss' : 'keung';
+  F.hp = FIGHT.hp; F.cd = 0; F.wave = null; F.koT = 0; F.move = 0;
+  Object.assign(F.b, { x: 0.2, dest: 0.3, state: 'idle', T: 0, y: 0, vy: 0, dodge: 0, bubble: null });
+  Object.assign(F.r, { x: 0.8, state: 'idle', T: 0, y: 0, hit: false, home: 0.8, dir: -1, hits: 0 });
+  (Sound.fightVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  fightApplyButtons();
+  floatText(`${FIGHTERS[F.who].name}上場！`, W / 2, H * 0.35, '#7a4fd0', 1.4);
+  Sound.sfx('level');
 }
 
 function endFight() {
@@ -1448,15 +1497,22 @@ function fightSpecialStart(F, voice) {
   F.cd = FIGHT.specialCd; F.r.T = 0; F.r.hit = false;
   Sound.fightVoice(voice); fightMaybeDodge(F);
 }
+function fightKick() {
+  const F = game && game.fight;
+  if (!fightReady(F) || F.who !== 'boss') return;
+  F.r.state = 'kick'; F.r.T = 0; F.r.hit = false;
+  fightMaybeDodge(F); Sound.sfx('mace');
+}
 function fightWave() {
   const F = game && game.fight;
   if (!fightReady(F) || F.cd > 0) return;
-  F.r.state = 'prepare'; fightSpecialStart(F, 0);
+  F.r.state = 'prepare'; fightSpecialStart(F, F.who === 'boss' ? -1 : 0);
 }
+// 強叔：衝天鑊鏟；老闆娘：連環腳。兩招都係先衝埋去
 function fightUppercut() {
   const F = game && game.fight;
   if (!fightReady(F) || F.cd > 0) return;
-  F.r.state = 'dash'; fightSpecialStart(F, 1);
+  F.r.state = 'dash'; fightSpecialStart(F, F.who === 'boss' ? pick([3, 4]) : 1);
 }
 function fightSpin() {
   const F = game && game.fight;
@@ -1464,7 +1520,7 @@ function fightSpin() {
   F.r.state = 'spin'; F.r.home = F.r.x;
   // 由右至左橫過畫面；已經喺最左就由左至右
   F.r.dir = F.r.x > 0.25 ? -1 : 1;
-  fightSpecialStart(F, 2);
+  fightSpecialStart(F, F.who === 'boss' ? 5 : 2);
 }
 
 function fightHit(atk, kind) {
@@ -1500,18 +1556,32 @@ function updateFight(dt) {
     // 出拳圖隻手好長，判定距離 = 手臂長度 + Benny 半個身闊
     if (!r.hit && r.T > 0.12) { r.hit = true; if (Math.abs(b.x - r.x) * W < u * FIGHT.h * 0.9) fightHit(FIGHT.punch, 'hit'); }
     if (r.T > FIGHT.punch.time) r.state = 'idle';
+  } else if (r.state === 'kick') {
+    if (!r.hit && r.T > 0.15) { r.hit = true; if (Math.abs(b.x - r.x) * W < u * FIGHT.h * 0.95) fightHit(FIGHT.kick, 'hit'); }
+    if (r.T > FIGHT.kick.time) r.state = 'idle';
+  } else if (r.state === 'multi') {
+    // 連環腳：平均踢五下，下下都要踢得到先計
+    const M = FIGHT.multi;
+    while (r.hits < M.hits && r.T > (r.hits + 0.5) * M.time / M.hits) {
+      r.hits++; Sound.sfx('bat');
+      if (Math.abs(b.x - r.x) * W < u * FIGHT.h * 0.95) fightHit(M, 'hit');
+    }
+    if (r.T > M.time) r.state = 'idle';
   } else if (r.state === 'prepare') {
-    if (r.T > FIGHT.wave.prepare) {
+    if (r.T > (F.who === 'boss' ? 0.45 : FIGHT.wave.prepare)) {
       r.state = 'wave'; r.T = 0;
-      F.wave = { x: r.x + (b.x < r.x ? -0.08 : 0.08), dir: b.x < r.x ? -1 : 1, t: 0 };
-      Sound.sfx('flame');
+      F.wave = { x: r.x + (b.x < r.x ? -0.08 : 0.08), dir: b.x < r.x ? -1 : 1, t: 0, who: F.who };
+      Sound.sfx(F.who === 'boss' ? 'go' : 'flame');
     }
   } else if (r.state === 'wave') {
     if (r.T > FIGHT.wave.time) r.state = 'idle';
   } else if (r.state === 'dash') {
     const d = b.x - r.x;
     r.x += Math.sign(d) * Math.min(Math.abs(d), FIGHT.upper.dash * dt);
-    if (close() || r.T > 0.6) { r.state = 'upper'; r.T = 0; r.hit = false; Sound.sfx('mace'); }
+    if (close() || r.T > 0.6) {
+      r.state = F.who === 'boss' ? 'multi' : 'upper'; r.T = 0; r.hit = false; r.hits = 0;
+      if (F.who !== 'boss') Sound.sfx('mace');
+    }
   } else if (r.state === 'upper') {
     r.y = Math.sin(Math.min(1, r.T / FIGHT.upper.time) * Math.PI) * u * 0.22;
     if (!r.hit && r.T > 0.1) { r.hit = true; if (close()) fightHit(FIGHT.upper, 'air'); }
@@ -1553,13 +1623,21 @@ function updateFight(dt) {
 }
 
 // 強叔暫代圖形：未有 assets/fight/rival*.png 先用
-function drawRivalPlaceholder(x, y, h, state, flip) {
-  const w = h * 0.55, s = flip ? -1 : 1;
+function drawRivalPlaceholder(x, y, h, state, flip, who = 'keung') {
+  const w = h * 0.55, s = flip ? -1 : 1, boss = who === 'boss';
   ctx.save(); ctx.translate(x, y); ctx.scale(s, 1); if (state === 'spin') ctx.rotate(game.t * 25);
   ctx.lineWidth = 3; ctx.strokeStyle = '#222';
   const box = (c, a, b, cw, ch) => { ctx.fillStyle = c; ctx.fillRect(a, b, cw, ch); ctx.strokeRect(a, b, cw, ch); };
-  box('#8a8f98', -w * 0.3, -h * 0.34, w * 0.25, h * 0.34); box('#8a8f98', w * 0.05, -h * 0.34, w * 0.25, h * 0.34);
-  box('#f4f1e6', -w * 0.42, -h * 0.72, w * 0.84, h * 0.4); box('#d9c8a0', -w * 0.3, -h * 0.58, w * 0.6, h * 0.3);
+  const leg = boss ? '#3a3350' : '#8a8f98';
+  box(leg, -w * 0.3, -h * 0.34, w * 0.25, h * 0.34); box(leg, w * 0.05, -h * 0.34, w * 0.25, h * 0.34);
+  // 踢腳：一隻腳向前伸；連環腳就上下咁抖
+  if (state === 'kick' || state === 'multi') {
+    ctx.save(); ctx.translate(-w * 0.15, -h * 0.36);
+    ctx.rotate(state === 'multi' ? Math.sin(game.t * 45) * 0.45 : 0.15);
+    box(leg, -w * 1.05, -h * 0.05, w * 1.05, h * 0.1); ctx.restore();
+  }
+  box(boss ? '#d9537f' : '#f4f1e6', -w * 0.42, -h * 0.72, w * 0.84, h * 0.4); box(boss ? '#f6efe0' : '#d9c8a0', -w * 0.3, -h * 0.58, w * 0.6, h * 0.3);
+  if (boss) { ctx.fillStyle = '#2b1d2a'; ctx.beginPath(); ctx.arc(0, -h * 0.9, h * 0.18, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
   ctx.fillStyle = '#f1c9a0'; ctx.beginPath(); ctx.arc(0, -h * 0.84, h * 0.15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   // 手：向左（面向 Benny）
   const armUp = state === 'prepare', armOut = ['punch', 'wave', 'spin'].includes(state);
@@ -1570,7 +1648,8 @@ function drawRivalPlaceholder(x, y, h, state, flip) {
   else ctx.fillRect(-w * 0.55, -h * 0.68, w * 0.16, h * 0.34);
   ctx.restore();
   ctx.save(); ctx.font = `900 ${Math.max(12, h * 0.08)}px ${getComputedStyle(document.body).fontFamily}`; ctx.textAlign = 'center';
-  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeText('強叔', x, y + h * 0.1); ctx.fillStyle = '#333'; ctx.fillText('強叔', x, y + h * 0.1); ctx.restore();
+  const label = FIGHTERS[who].name;
+  ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeText(label, x, y + h * 0.1); ctx.fillStyle = '#333'; ctx.fillText(label, x, y + h * 0.1); ctx.restore();
 }
 
 function drawFight() {
@@ -1590,22 +1669,22 @@ function drawFight() {
 
   // 強叔（圖片面向左，Benny 喺右邊就反轉）
   const rFlip = r.state === 'spin' || r.state === 'back' ? r.dir > 0 : b.x > r.x;
-  const key = { punch: 'fight_rival_punch', prepare: 'fight_rival_prepare', wave: 'fight_rival_wave', dash: 'fight_rival', upper: 'fight_rival_uppercut', spin: 'fight_rival_spin' }[r.state] || 'fight_rival';
+  const who = FIGHTERS[F.who], key = who.keys[r.state] || who.base;
   const rx = r.x * W, ry = g - r.y;
-  const useKey = IMG[key] ? key : 'fight_rival';
+  const useKey = IMG[key] ? key : who.base;
   if (IMG[useKey]) {
     // 用腳底位置對齊，出招轉圖時個人唔會跳位
-    const P = RIVAL_POSE[useKey], S = h / P.bh, off = (0.5 - P.ax) * S;
+    const P = RIVAL_POSE[useKey] || DEFAULT_POSE, S = h / P.bh, off = (0.5 - P.ax) * S;
     drawSprite(useKey, rx + (rFlip ? -off : off), ry + (1 - P.ay) * S, S, { flip: rFlip, rot: r.state === 'spin' ? Math.sin(game.t * 30) * 0.08 : 0 });
-  } else drawRivalPlaceholder(rx, ry, h, r.state, rFlip);
+  } else drawRivalPlaceholder(rx, ry, h, r.state, rFlip, F.who);
 
-  // 鑊氣波
+  // 鑊氣波／氣功掌
   if (F.wave) {
-    const wx = F.wave.x * W, wy = g - h * 0.55, s = h * 0.6;
-    if (IMG.fight_wave) drawSprite('fight_wave', wx, wy + s / 2, s, { flip: F.wave.dir > 0 });
+    const wx = F.wave.x * W, wy = g - h * 0.55, s = h * 0.6, qi = F.wave.who === 'boss', wKey = qi ? 'fight_boss_qi' : 'fight_wave';
+    if (IMG[wKey]) drawSprite(wKey, wx, wy + s / 2, s, { flip: F.wave.dir > 0 });
     else {
       const gr = ctx.createRadialGradient(wx, wy, s * 0.05, wx, wy, s * 0.5);
-      gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.5, '#ffb030'); gr.addColorStop(1, 'rgba(232,80,20,0)');
+      gr.addColorStop(0, qi ? '#fff0f6' : '#fff6c0'); gr.addColorStop(0.5, qi ? '#ff6fa8' : '#ffb030'); gr.addColorStop(1, qi ? 'rgba(200,40,120,0)' : 'rgba(232,80,20,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(wx, wy, s * 0.5, 0, Math.PI * 2); ctx.fill();
     }
   }
@@ -1618,7 +1697,7 @@ function drawFight() {
   ctx.fillStyle = F.hp > 30 ? '#ffd45c' : '#e8404f'; ctx.fillRect(bx0, by0, bw * F.hp / FIGHT.hp, bh0);
   const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(15, U * 0.036);
   ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-  const s = `🥊 Benny ・ ${fmt(F.score)} 分 ・ KO ${F.kos} 次`;
+  const s = `🥊 ${who.name} VS 袁枝 ・ ${fmt(F.score)} 分 ・ KO ${F.kos} 次`;
   ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, by0 + bh0 + fs);
   ctx.fillStyle = '#533396'; ctx.fillText(s, W / 2, by0 + bh0 + fs);
   ctx.restore();
@@ -2426,6 +2505,8 @@ $('btn-fight-punch').addEventListener('click', fightPunch);
 $('btn-fight-wave').addEventListener('click', fightWave);
 $('btn-fight-upper').addEventListener('click', fightUppercut);
 $('btn-fight-spin').addEventListener('click', fightSpin);
+$('btn-fight-kick').addEventListener('click', fightKick);
+$('btn-fight-swap').addEventListener('click', fightSwap);
 $('btn-fight-spare').addEventListener('click', () => { if (game && game.phase === 'fight') endFight(); });
 [['btn-fight-left', -1], ['btn-fight-right', 1]].forEach(([id, dir]) => {
   const b = $(id), set = (v) => { if (game && game.fight) game.fight.move = v; };
