@@ -1002,7 +1002,7 @@ function startZoom() {
 // ============================================================
 function startPunishIntro() {
   game.phase = 'punishIntro';
-  game.mini = { hits: 0, score: 0, t: 0, tier: 0, bumps: 0, charred: 0, lastHit: -1, swing: 0, hitPt: null, count: 3, motion: false, milestone: 0, topTier: 0, hitKey: HIT_KEYS[0] };
+  game.mini = { hits: 0, score: 0, t: 0, tier: 0, bumps: 0, charred: 0, lastHit: -1, swing: 0, hitPt: null, count: 3, motion: false, milestone: 0, topTier: 0, hitKey: HIT_KEYS[0], parts: {} };
   show('scr-punish');
   const canShake = 'DeviceMotionEvent' in window && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
   $('btn-shake').classList.toggle('hidden', !canShake);
@@ -1212,8 +1212,9 @@ function endIfc(add) {
   game.phase = 'punish'; game.ifc = null;
   hide('ifc-hud'); punishButtons(true);
   (Sound.ifcVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  miniAdd('ifc', add);
   if (add > 0) {
-    M.score += add; M.ifcFell = true;
+    M.ifcFell = true;
     floatText(`IFC 天台 +${add}`, W / 2, H * 0.4, '#4f7fd9', 1.3);
     Sound.sfx('level');
   }
@@ -1291,6 +1292,13 @@ function drawIfc() {
   ctx.restore();
 }
 
+// 小遊戲分數：加入懲罰分，同時逐個記低，結算時列明細（玩過就有一行，0 分都有）
+const MINI_NAMES = { ifc: 'IFC 天台', burn: '燒碳', animal: '蛇蟲鼠蟻', brothel: '妓寨', fight: '街坊對打', yum: '飲茶', bottle: '爆樽' };
+function miniAdd(name, add) {
+  const M = game.mini;
+  M.score += add; M.parts[name] = (M.parts[name] || 0) + add;
+}
+
 // 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
 function punishButtons(on) {
   ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight', 'btn-yum', 'btn-bottle'].forEach((id) => (on ? show(id) : hide(id)));
@@ -1361,7 +1369,8 @@ function endBottle() {
   const B = game.bottle, M = game.mini;
   game.phase = 'punish'; game.bottle = null;
   punishButtons(true); Sound.bottleStop();
-  if (B.score > 0) { M.score += B.score; M.bottleHits = (M.bottleHits || 0) + B.total; floatText(`爆樽 +${B.score}`, W / 2, H * 0.4, '#2f8f4e', 1.3); }
+  miniAdd('bottle', B.score);
+  if (B.score > 0) { M.bottleHits = (M.bottleHits || 0) + B.total; floatText(`爆樽 +${B.score}`, W / 2, H * 0.4, '#2f8f4e', 1.3); }
 }
 
 function bottleSwap() {
@@ -1542,7 +1551,8 @@ function endYum() {
   game.phase = 'punish'; game.yum = null;
   hide('yum-hud'); punishButtons(true);
   (Sound.yumVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
-  if (add > 0) { M.score += add; M.yumFoods = (M.yumFoods || 0) + Y.total; floatText(`飲茶 +${add}`, W / 2, H * 0.4, '#c98a2b', 1.3); }
+  miniAdd('yum', add);
+  if (add > 0) { M.yumFoods = (M.yumFoods || 0) + Y.total; floatText(`飲茶 +${add}`, W / 2, H * 0.4, '#c98a2b', 1.3); }
 }
 
 function yumServe() {
@@ -1721,7 +1731,8 @@ function endFight() {
   game.phase = 'punish'; game.fight = null;
   hide('fight-hud'); punishButtons(true);
   (Sound.fightVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
-  if (F.score > 0) { M.score += F.score; M.fightKOs = (M.fightKOs || 0) + F.kos; floatText(`街坊對打 +${F.score}`, W / 2, H * 0.4, '#7a4fd0', 1.3); }
+  miniAdd('fight', F.score);
+  if (F.score > 0) { M.fightKOs = (M.fightKOs || 0) + F.kos; floatText(`街坊對打 +${F.score}`, W / 2, H * 0.4, '#7a4fd0', 1.3); }
 }
 
 // 出招前 Benny 有機會閃開
@@ -1993,6 +2004,7 @@ function startBrothel() {
 
 function endBrothel() {
   game.phase = 'punish'; game.brothel = null;
+  miniAdd('brothel', 0);   // 妓寨冇計分，都列出嚟等玩家知道玩過
   hide('brothel-hud'); punishButtons(true);
   (Sound.brothelVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
 }
@@ -2178,7 +2190,8 @@ function endAnimal() {
   game.phase = 'punish'; game.animal = null;
   hide('animal-hud'); punishButtons(true);
   (Sound.animalVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
-  if (add > 0) { M.score += add; M.animalThrown = (M.animalThrown || 0) + A.thrown; floatText(`蛇蟲鼠蟻 +${add}`, W / 2, H * 0.4, '#5c9a4a', 1.3); }
+  miniAdd('animal', add);
+  if (add > 0) { M.animalThrown = (M.animalThrown || 0) + A.thrown; floatText(`蛇蟲鼠蟻 +${add}`, W / 2, H * 0.4, '#5c9a4a', 1.3); }
 }
 
 function drawCritter(c, st) {
@@ -2334,7 +2347,8 @@ function endBurn(add) {
   game.phase = 'punish'; game.burn = null;
   punishButtons(true);
   (Sound.burnVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
-  if (add > 0) { M.score += add; M.burnSaved = true; floatText(`燒碳救人 +${add}`, W / 2, H * 0.4, '#e0763a', 1.3); }
+  miniAdd('burn', add);
+  if (add > 0) { M.burnSaved = true; floatText(`燒碳救人 +${add}`, W / 2, H * 0.4, '#e0763a', 1.3); }
 }
 
 function updateBurn(dt) {
@@ -2532,12 +2546,22 @@ function showResult() {
   $('res-main').textContent = fmt(game.score);
   $('res-time-label').textContent = `用時加分（${game.elapsed.toFixed(1)} 秒）`;
   $('res-time').textContent = '+' + fmt(timeBonus);
-  $('res-mini-label').textContent = `懲罰分（${M.hits} 下，${M.t.toFixed(1)} 秒）`;
-  $('res-mini').textContent = '+' + fmt(M.score);
+  // 連打分 = 懲罰分減走小遊戲；之後每個玩過嘅小遊戲一行，全部加埋就係總分
+  const played = Object.keys(MINI_NAMES).filter((k) => k in M.parts);
+  const tapScore = M.score - played.reduce((s, k) => s + M.parts[k], 0);
+  $('res-mini-label').textContent = `連打懲罰（${M.hits} 下，${M.t.toFixed(1)} 秒）`;
+  $('res-mini').textContent = '+' + fmt(tapScore);
+  document.querySelectorAll('tr.res-part').forEach((tr) => tr.remove());
+  const totalRow = $('res-total').parentElement;
+  for (const k of played) {
+    const tr = document.createElement('tr'), name = document.createElement('td'), pts = document.createElement('td');
+    tr.className = 'res-part'; name.textContent = MINI_NAMES[k]; pts.textContent = '+' + fmt(M.parts[k]);
+    tr.append(name, pts); totalRow.before(tr);
+  }
   $('res-total').textContent = fmt(total);
   $('res-best').textContent = isNew ? '🎉 破咗紀錄！' : `最高分：${fmt(best)}`;
   $('res-title').textContent = isNew ? '新紀錄！' : '打完收工！';
-  $('copy-text').textContent = '';
+  $('copy-text').textContent = ''; $('copy-preview').value = ''; hide('copy-preview');
   hide('hud'); show('scr-result');
 }
 
@@ -2547,16 +2571,38 @@ function shareText() {
   return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈${ifc}\n你夠唔夠我快？`;
 }
 
+// 返回 'ok'（確定寫入）、'maybe'（舊方法，瀏覽器話得但冇得確認）或者 'fail'
 function copyText(text) {
   const fallback = () => {
     const ta = document.createElement('textarea');
-    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.select();
-    let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-    ta.remove(); return ok;
+    ta.value = text; ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0'; ta.style.fontSize = '16px';
+    ta.style.userSelect = 'text'; ta.style.webkitUserSelect = 'text';   // 成個遊戲禁止揀字，呢度要開返
+    ta.contentEditable = 'true';   // iPhone 要咁先揀到字
+    document.body.appendChild(ta);
+    ta.focus({ preventScroll: true }); ta.select(); ta.setSelectionRange(0, text.length);
+    let ok = false;
+    // 冇揀齊就唔好 copy，否則剪貼簿仲係舊內容，但瀏覽器照話成功
+    if (ta.selectionEnd - ta.selectionStart === text.length) { try { ok = document.execCommand('copy'); } catch (e) { ok = false; } }
+    ta.remove(); return ok ? 'maybe' : 'fail';
   };
-  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).then(() => true, fallback);
+  if (navigator.clipboard && window.isSecureContext) {
+    // 有啲內置瀏覽器嘅 writeText 永遠唔返回，等太耐當失敗
+    const late = new Promise((res) => setTimeout(() => res('fail'), 1500));
+    return Promise.race([navigator.clipboard.writeText(text).then(() => 'ok', fallback), late]);
+  }
   return Promise.resolve(fallback());
+}
+
+const COPY_MSG = {
+  ok: '✅ 已複製，可以貼去群組喇！',
+  maybe: '已嘗試複製。如果貼出嚟嘅分數唔啱，請長按下面文字手動複製 👇',
+  fail: '複製唔到，請長按下面文字手動複製 👇',
+};
+function copyResult() {
+  const text = shareText(), box = $('copy-preview');
+  box.value = text; show('copy-preview');
+  box.style.height = 'auto'; box.style.height = `${box.scrollHeight + 4}px`;   // 玩多幾個小遊戲句子會多啲，全部顯示
+  copyText(text).then((r) => { $('copy-text').textContent = COPY_MSG[r]; });
 }
 
 // ============================================================
@@ -2782,7 +2828,7 @@ $('btn-shake').addEventListener('click', enableShake);
 $('btn-resume').addEventListener('click', () => pause(false));
 $('btn-mute').addEventListener('click', () => { Sound.init(); Sound.setMuted(!Sound.muted); });
 $('btn-copy').addEventListener('click', () => {
-  copyText(shareText()).then((ok) => { $('copy-text').textContent = ok ? '✅ 已複製，可以貼去群組喇！' : '複製唔到，請手動截圖分享 🙏'; });
+  copyResult();
 });
 
 // ============================================================

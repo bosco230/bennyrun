@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -153,6 +153,7 @@
     <button class="big" id="btn-copy">📋 複製成績</button>
     <button class="ghost" id="btn-again">再玩一次</button>
     <div class="sub small" id="copy-text"></div>
+    <textarea id="copy-preview" class="hidden" readonly rows="4" aria-label="複製內容"></textarea>
   </div>
 </div>
 
@@ -164,6 +165,6 @@
   </div>
 </div>
 
-<script src="game.js?v=41"></script>
+<script src="game.js?v=43"></script>
 </body>
 </html>

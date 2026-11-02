@@ -261,7 +261,14 @@ button.ghost {
 .weapons div { flex: 1; font-size: 12px; font-weight: 700; line-height: 1.3; }
 .weapons img { width: 100%; max-width: 72px; aspect-ratio: 1; object-fit: contain; display: block; margin: 0 auto 2px; }
 
+#copy-preview {
+  display: block; width: 100%; margin-top: 8px; padding: 8px 10px; box-sizing: border-box; resize: none;
+  border: 2px dashed #eadfcd; border-radius: 12px; background: #fff; color: var(--ink);
+  font-family: inherit; font-size: 16px; line-height: 1.35;
+  user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; touch-action: auto;
+}
 table.score { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 18px; }
 table.score td { padding: 6px 4px; border-bottom: 2px dashed #eadfcd; }
 table.score td:last-child { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+table.score tr.res-part td { font-size: 16px; padding: 4px; }
 table.score tr.total td { font-size: 24px; color: var(--pink-dark); border-bottom: 0; font-weight: 900; }
