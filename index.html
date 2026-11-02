@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -63,6 +63,16 @@
   <div class="fight-bottom">
     <button id="btn-fight-swap">換人再打</button>
     <button id="btn-fight-spare">放過佢</button>
+  </div>
+</div>
+
+<!-- 懲罰：爆樽（右邊，喺街坊對打下面） -->
+<button id="btn-bottle" class="hidden">🍾 爆樽</button>
+<div id="bottle-hud" class="hidden">
+  <button id="btn-bottle-throw">🍺 掟樽</button>
+  <div class="bottle-bottom">
+    <button id="btn-bottle-swap">換武器</button>
+    <button id="btn-bottle-spare">放過佢</button>
   </div>
 </div>
 
@@ -154,6 +164,6 @@
   </div>
 </div>
 
-<script src="game.js?v=33"></script>
+<script src="game.js?v=41"></script>
 </body>
 </html>

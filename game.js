@@ -85,13 +85,23 @@ const IMG_SRC = {
   yum_food4: 'assets/yumcha/food4.png',
   yum_food5: 'assets/yumcha/food5.png',
   yum_food6: 'assets/yumcha/food6.png',
+  bottle_bg: 'assets/bottle/bg.jpg',
+  bottle_walk1: 'assets/bottle/walk1.png',
+  bottle_walk2: 'assets/bottle/walk2.png',
+  bottle_hit: 'assets/bottle/hit.png',
+  bottle_stuck: 'assets/bottle/stuck.png',
+  bottle_fall: 'assets/bottle/fall.webp',
+  bottle_beer: 'assets/bottle/bottle.png',
+  bottle_flying: 'assets/bottle/flying.png',
+  bottle_chair1: 'assets/bottle/chair1.png',
+  bottle_chair2: 'assets/bottle/chair2.png',
   fight_boss: 'assets/fight/boss.png',
   fight_boss_punch: 'assets/fight/boss_punch.png',
   fight_boss_kick: 'assets/fight/boss_kick.png',
   fight_boss_prepare: 'assets/fight/boss_prepare.png',
   fight_boss_wave: 'assets/fight/boss_wave.png',
   fight_boss_multi: 'assets/fight/boss_multi.png',
-  fight_boss_spin: 'assets/fight/boss_spin.png',
+  fight_boss_spin: 'assets/fight/boss_spin.png?v=2',
   fight_boss_qi: 'assets/fight/boss_qi.png',
   fight_benny: 'assets/fight/benny.png',
   fight_benny_hit: 'assets/fight/benny_hit.png',
@@ -303,7 +313,7 @@ window.addEventListener('resize', resize);
 // ============================================================
 const IMG = {};
 // 公園主關要用嘅圖先載入；懲罰相、IFC 天台、燒碳嘅圖等開始畫面出咗之後喺背景慢慢載，手機開得快啲
-const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_|fight_|yum_)/.test(k);
+const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_|fight_|yum_|bottle_)/.test(k);
 function loadImages(keys, showProgress) {
   let done = 0;
   return Promise.all(keys.map((k) => new Promise((res) => {
@@ -376,13 +386,16 @@ const Sound = {
     this.brothelVoices = BROTHEL_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.fightVoices = FIGHT_VOICES.map((src) => { const a = new Audio(src); a.preload = 'auto'; return a; });
     this.yumVoices = YUM_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
-    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices, ...this.fightVoices, ...this.yumVoices].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
+    this.bottleHits = BOTTLE_HITS.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
+    this.bottleMusics = {};
+    Object.entries(BOTTLE_MUSIC).forEach(([k, src]) => { const a = new Audio(src); a.preload = 'auto'; this.bottleMusics[k] = a; });
+    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices, ...this.fightVoices, ...this.yumVoices, ...this.bottleHits, ...Object.values(this.bottleMusics)].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
   },
 
   setMuted(m) {
     this.muted = m; store.set('kdyz-muted', m ? '1' : '0');
     if (this.master) this.master.gain.value = m ? 0 : 1;
-    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || []), ...(this.fightVoices || []), ...(this.yumVoices || [])].forEach((a) => { a.muted = m; });
+    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || []), ...(this.fightVoices || []), ...(this.yumVoices || []), ...(this.bottleHits || []), ...Object.values(this.bottleMusics || {})].forEach((a) => { a.muted = m; });
     const v = document.getElementById('ifc-video'); if (v) v.muted = m;
     $('btn-mute').textContent = m ? '🔇' : '🔊';
   },
@@ -419,6 +432,33 @@ const Sound = {
     if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
     return YUM_VOICES[i].text;
   },
+
+  // 爆樽音樂：入場、背景（不停循環）、完結，同一時間只播一首
+  bottleMusic(name) {
+    Object.values(this.bottleMusics || {}).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.bottleMusics && this.bottleMusics[name];
+    if (!a) return 0;
+    a.loop = name === 'bgm'; a.volume = name === 'bgm' ? BOTTLE.bgmVol : 1;
+    try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ }
+    return Number.isFinite(a.duration) ? a.duration : 0;
+  },
+  // 爆樽打中語音：隨機、唔連續重複；啱啱開始播嗰句唔會即刻被截斷
+  bottleVoice() {
+    const now = performance.now();
+    if (now - (this.bottleAt || 0) < BOTTLE.voiceGap && (this.bottleHits || []).some((a) => !a.paused)) return null;
+    this.bottleAt = now;
+    let i; do { i = Math.floor(Math.random() * BOTTLE_HITS.length); } while (i === this.lastBottle && BOTTLE_HITS.length > 1);
+    this.lastBottle = i;
+    (this.bottleHits || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.bottleHits && this.bottleHits[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+    return BOTTLE_HITS[i].text;
+  },
+  bottleAudio() { return [...(this.bottleHits || []), ...Object.values(this.bottleMusics || {})]; },
+  bottleStop() { this.bottleAudio().forEach((a) => { if (!a.paused) a.pause(); }); },
+  // 暫停時記低邊啲仲播緊，繼續時接返
+  bottlePause() { this.bottleHeld = this.bottleAudio().filter((a) => !a.paused); this.bottleHeld.forEach((a) => a.pause()); },
+  bottleResume() { (this.bottleHeld || []).forEach((a) => { const p = a.play(); if (p) p.catch(() => {}); }); this.bottleHeld = []; },
 
   // 對打招式聲音：0 鑊氣波、1 衝天鑊鏟、2 旋風拖鞋
   fightVoice(i) {
@@ -497,6 +537,9 @@ const Sound = {
       case 'count': this.tone('sine', 880, 0, 0.15, 0.25); break;
       case 'go': this.tone('sine', 1320, 0, 0.35, 0.3); break;
       case 'end': [784, 659, 523, 784, 1046].forEach((f, i) => this.tone('triangle', f, 0, 0.22, 0.22, i * 0.1)); break;
+      case 'glass': this.noise(0.22, 0.55, 5200, 0, 0.8); this.tone('triangle', 2400, 1200, 0.12, 0.14); this.tone('triangle', 3300, 1800, 0.1, 0.1, 0.04); break;
+      case 'wood': this.tone('sine', 150, 60, 0.18, 0.55); this.noise(0.1, 0.45, 900, 0, 1); break;
+      case 'throw': this.noise(0.18, 0.16, 1400, 0, 0.7); break;
     }
   },
 
@@ -1250,7 +1293,208 @@ function drawIfc() {
 
 // 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
 function punishButtons(on) {
-  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight', 'btn-yum'].forEach((id) => (on ? show(id) : hide(id)));
+  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight', 'btn-yum', 'btn-bottle'].forEach((id) => (on ? show(id) : hide(id)));
+}
+
+// ============================================================
+// 爆樽：袁枝喺舞台左右行，玩家撳掣由台下掟啤酒樽或者摺凳過去（拋物線）。
+// 打中變被打圖，連中幾下就跌落地。唔限時；撳「放過佢」播完完結音樂先返回
+// ============================================================
+const BOTTLE = {
+  floorY: 0.72, walkU: [0.24, 0.76],   // 舞台地台高度同行走範圍（背景相比例）
+  heightK: 0.42, speed: 0.5, frame: 0.8, bgmVol: 0.55, voiceGap: 1500,
+  flight: 0.7, arc: 0.22, gap: 0.28, lead: 0.6,
+  hitR: 0.3, hitTime: 0.6, fallAt: 5, fallTime: 2.6, comboGap: 3, fallBonus: 200,
+  weapons: {
+    bottle: { label: '🍺 掟樽', score: 40, size: 0.22, hit: 'bottle_hit', sfx: 'glass', bits: ['#3f9a2e', '#8fd46a', '#d8f5c8'] },
+    chair: { label: '🪑 掟凳', score: 60, size: 0.34, hit: 'bottle_stuck', sfx: 'wood', bits: ['#b5651d', '#8a4a14', '#e0a060'] },
+  },
+  // 每張圖：ax 係兩腳中間喺圖片闊度幾多，hk 係畫幾高（身高嘅倍數），令個人換圖唔會忽大忽細
+  pose: {
+    bottle_walk1: { ax: 0.45, hk: 1 },
+    bottle_walk2: { ax: 0.37, hk: 0.935 },
+    bottle_hit: { ax: 0.5, hk: 1.095 },
+    bottle_stuck: { ax: 0.57, hk: 0.87 },
+  },
+};
+const BOTTLE_MUSIC = { intro: 'assets/bottle/intro.m4a', bgm: 'assets/bottle/bgm.m4a', finish: 'assets/bottle/finish.m4a' };
+const BOTTLE_HITS = [
+  { src: 'assets/bottle/hit_v1.m4a', text: '創作是很主觀的' },
+  { src: 'assets/bottle/hit_v2.m4a', text: '創作是很主觀的' },
+  { src: 'assets/bottle/hit_v3.m4a', text: '你哋唱咩啊？' },
+  { src: 'assets/bottle/hit_v4.m4a', text: '你識唔識聽中文' },
+  { src: 'assets/bottle/hit_v5.m4a', text: '哎呀！' },
+  { src: 'assets/bottle/hit_v6.m4a', text: '左邊先係金剛腿' },
+  { src: 'assets/bottle/hit_v7.m4a', text: '我唔係鐵頭' },
+  { src: 'assets/bottle/hit_v8.m4a', text: '我唔係鐵頭' },
+  { src: 'assets/bottle/hit_v9.m4a', text: '金剛腿和鐵頭功' },
+];
+
+// 背景以畫面中間 cover，舞台位置跟住背景相計
+function bottleLayout() {
+  const im = IMG.bottle_bg, iw = im ? im.width : 1672, ih = im ? im.height : 941;
+  const s = Math.max(W / iw, H / ih), w = iw * s, ih2 = ih * s, x = (W - w) / 2, y = (H - ih2) / 2;
+  const floor = y + BOTTLE.floorY * ih2, h = Math.min(H * BOTTLE.heightK, floor * 0.75);
+  return { floor, h, lo: Math.max(x + BOTTLE.walkU[0] * w, h * 0.3) / W, hi: Math.min(x + BOTTLE.walkU[1] * w, W - h * 0.3) / W };
+}
+
+function startBottle() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false); show('bottle-hud');
+  game.bottle = { t: 0, u: 0.5, dir: Math.random() < 0.5 ? -1 : 1, state: 'walk', T: 0, weapon: 'bottle', shots: [], bits: [], cd: 0, combo: 0, comboT: 0, total: 0, score: 0, falls: 0, hitKey: 'bottle_hit', bubble: null, finishing: false, finishT: 0, introT: 0 };
+  game.phase = 'bottle';
+  $('btn-bottle-throw').textContent = BOTTLE.weapons.bottle.label;
+  game.bottle.introT = Sound.bottleMusic('intro') || 4.8;
+}
+
+// 撳「放過佢」：停晒其他聲，播完完結音樂先返回
+function bottleFinish() {
+  const B = game && game.bottle;
+  if (!B || B.finishing) return;
+  B.finishing = true; hide('bottle-hud');
+  (Sound.bottleHits || []).forEach((a) => { if (!a.paused) a.pause(); });
+  B.finishT = Sound.bottleMusic('finish') || 7.1; B.bubble = null;
+  floatText('收工！', W / 2, H * 0.35, '#e86a8c', 1.5);
+}
+
+function endBottle() {
+  const B = game.bottle, M = game.mini;
+  game.phase = 'punish'; game.bottle = null;
+  punishButtons(true); Sound.bottleStop();
+  if (B.score > 0) { M.score += B.score; M.bottleHits = (M.bottleHits || 0) + B.total; floatText(`爆樽 +${B.score}`, W / 2, H * 0.4, '#2f8f4e', 1.3); }
+}
+
+function bottleSwap() {
+  const B = game && game.bottle;
+  if (!B || B.finishing) return;
+  B.weapon = B.weapon === 'bottle' ? 'chair' : 'bottle';
+  $('btn-bottle-throw').textContent = BOTTLE.weapons[B.weapon].label;
+  Sound.sfx('miss');
+}
+
+function bottleThrow() {
+  const B = game && game.bottle;
+  if (!B || B.finishing || B.cd > 0 || game.paused) return;
+  const L = bottleLayout(), down = B.state === 'fall';
+  B.cd = BOTTLE.gap;
+  // 瞄準佢行緊去嘅位置，唔係百發百中；佢撞牆轉身或者企定就可能掟空
+  const u1 = B.u + (B.state === 'walk' ? B.dir * (BOTTLE.speed * L.h / W) * BOTTLE.flight * BOTTLE.lead : 0);
+  B.shots.push({ kind: B.weapon, t: 0, x0: W / 2 + rand(-0.2, 0.2) * W, y0: H + L.h * 0.1, x1: clamp(u1, 0.04, 0.96) * W, y1: L.floor - L.h * (down ? 0.3 : 0.85), done: false, x: 0, y: 0 });
+  Sound.sfx('throw');
+}
+
+function bottleShotPos(s) {
+  const k = s.t / BOTTLE.flight, A = H * BOTTLE.arc;
+  return { x: s.x0 + (s.x1 - s.x0) * k, y: s.y0 + (s.y1 - s.y0) * k - A * 4 * k * (1 - k), k };
+}
+
+function bottleBurst(B, kind, x, y, n) {
+  const w = BOTTLE.weapons[kind];
+  for (let i = 0; i < n; i++) B.bits.push({ x, y, vx: rand(-260, 260), vy: rand(-340, -40), r: rand(2, 6), c: pick(w.bits), t: 0, life: rand(0.4, 0.8), rot: rand(0, 6) });
+}
+
+function bottleLand(B, s, L) {
+  const w = BOTTLE.weapons[s.kind], x = B.u * W, down = B.state === 'fall';
+  B.total++; B.score += w.score; game.shake = 0.25;
+  Sound.sfx(w.sfx); bottleBurst(B, s.kind, s.x, s.y, 16);
+  floatText(`+${w.score}`, s.x, s.y - L.h * 0.1, '#ffd45c', 1);
+  if (!B.finishing) { const text = Sound.bottleVoice(); if (text) B.bubble = { text, t: 1.6 }; }
+  if (down) return;
+  B.combo++; B.comboT = BOTTLE.comboGap;
+  if (B.combo >= BOTTLE.fallAt) {
+    B.state = 'fall'; B.T = BOTTLE.fallTime; B.combo = 0; B.falls++; B.score += BOTTLE.fallBonus;
+    floatText(`打跌咗！+${BOTTLE.fallBonus}`, x, L.floor - L.h * 1.05, '#ff8c00', 1.4); Sound.sfx('level'); game.shake = 0.45;
+  } else { B.state = 'hit'; B.T = BOTTLE.hitTime; B.hitKey = w.hit; }
+}
+
+function updateBottle(dt) {
+  const B = game.bottle, L = bottleLayout();
+  B.t += dt; B.cd = Math.max(0, B.cd - dt);
+  if (B.bubble) { B.bubble.t -= dt; if (B.bubble.t <= 0) B.bubble = null; }
+  if (B.combo > 0 && (B.comboT -= dt) <= 0) B.combo = 0;
+  if (B.finishing) {
+    if ((B.finishT -= dt) <= 0) { endBottle(); return; }
+  } else if (B.introT > 0 && (B.introT -= dt) <= 0) Sound.bottleMusic('bgm');
+
+  if (B.state === 'walk') {
+    if (!B.finishing) {
+      B.u += B.dir * (BOTTLE.speed * L.h / W) * dt;
+      if (B.u <= L.lo) { B.u = L.lo; B.dir = 1; } else if (B.u >= L.hi) { B.u = L.hi; B.dir = -1; } else if (Math.random() < 0.25 * dt) B.dir *= -1;
+    }
+  } else if ((B.T -= dt) <= 0) { B.state = 'walk'; if (B.u < L.lo) B.u = L.lo; if (B.u > L.hi) B.u = L.hi; }
+
+  B.shots = B.shots.filter((s) => {
+    s.t += dt;
+    const p = bottleShotPos(s); s.x = p.x; s.y = p.y;
+    if (!s.done && p.k >= 1) {
+      s.done = true;
+      const r = L.h * (B.state === 'fall' ? BOTTLE.hitR * 2 : BOTTLE.hitR);
+      if (Math.abs(p.x - B.u * W) < r) { bottleLand(B, s, L); return false; }
+      B.combo = 0;   // 掟空，連中重新計
+    }
+    if (s.done && p.y >= L.floor) { Sound.sfx(BOTTLE.weapons[s.kind].sfx); bottleBurst(B, s.kind, p.x, L.floor, 10); return false; }
+    return p.y < H + L.h;
+  });
+  B.bits = B.bits.filter((b) => {
+    b.t += dt; b.vy += 900 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.rot += 8 * dt;
+    return b.t < b.life;
+  });
+}
+
+function drawBottleShot(s, L) {
+  const w = BOTTLE.weapons[s.kind], k = s.t / BOTTLE.flight, grow = 1.7 - 0.7 * Math.min(1, k), size = L.h * w.size * grow;
+  ctx.save(); ctx.translate(s.x, s.y);
+  if (s.kind === 'chair') {
+    const im = IMG[Math.floor(s.t / 0.09) % 2 ? 'bottle_chair2' : 'bottle_chair1'];
+    ctx.rotate(s.t * 9);
+    if (im) ctx.drawImage(im, -size * aspectOf(im) / 2, -size / 2, size * aspectOf(im), size);
+  } else if (k < 0.18) {
+    // 啱啱掟出：完整啤酒樽打轉
+    const im = IMG.bottle_beer;
+    ctx.rotate(s.t * 12);
+    if (im) ctx.drawImage(im, -size * aspectOf(im) / 2, -size / 2, size * aspectOf(im), size);
+  } else {
+    // 飛行中：樽頭跟住拋物線方向。原圖樽頭向左上
+    const im = IMG.bottle_flying, d = 0.02, a0 = bottleShotPos({ ...s, t: s.t - d }), a1 = bottleShotPos(s);
+    const vx = a1.x - a0.x, vy = a1.y - a0.y, head = Math.atan2(-90, -255);
+    if (vx > 0) { ctx.rotate(Math.atan2(vy, vx) - Math.atan2(-90, 255)); ctx.scale(-1, 1); } else ctx.rotate(Math.atan2(vy, vx) - head);
+    const fh = size * 0.62;
+    if (im) ctx.drawImage(im, -fh * aspectOf(im) / 2, -fh / 2, fh * aspectOf(im), fh);
+  }
+  ctx.restore();
+}
+function aspectOf(im) { return im.width / im.height; }
+
+function drawBottle() {
+  const B = game.bottle, L = bottleLayout(), x = B.u * W;
+  drawCover('bottle_bg');
+  let headX = x, headY = L.floor - L.h * 1.02;
+  if (B.state === 'fall') {
+    // 跌地相連埋自己塊地台，腳底對返舞台；個頭喺相嘅右上方
+    const fw = Math.min(L.h * 0.85, W), fx = clamp(x, fw * 0.42, W - fw * 0.42);
+    drawSprite('bottle_fall', fx, L.floor + L.h * 0.08, fw);
+    headX = fx + fw * 0.2; headY = L.floor - fw * 0.72;
+  } else {
+    // 行緊兩張圖交替；放過佢之後企定
+    const key = B.state === 'hit' ? B.hitKey : (!B.finishing && Math.floor(B.t / BOTTLE.frame) % 2 ? 'bottle_walk2' : 'bottle_walk1');
+    const P = BOTTLE.pose[key], dh = L.h * P.hk, bob = B.state === 'walk' && !B.finishing ? Math.abs(Math.sin(B.t * 8)) * L.h * 0.012 : 0;
+    drawSprite(key, x + (0.5 - P.ax) * dh * aspect(key), L.floor - bob, dh);
+  }
+  for (const b of B.bits) {
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rot); ctx.fillStyle = b.c; ctx.globalAlpha = 1 - b.t / b.life;
+    ctx.fillRect(-b.r, -b.r / 2, b.r * 2, b.r); ctx.restore();
+  }
+  for (const s of B.shots) drawBottleShot(s, L);
+  if (B.bubble) drawBubble(B.bubble.text, headX, headY, '#2f8f4e');
+
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(15, U * 0.036), ty = Math.max(70, H * 0.1);
+  ctx.save();
+  ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const s = `🍾 ${fmt(B.score)} 分 ・ 中 ${B.total} 下 ・ 連中 ${B.combo}/${BOTTLE.fallAt}`;
+  ctx.lineWidth = fs * 0.22; ctx.strokeStyle = '#fff'; ctx.strokeText(s, W / 2, ty);
+  ctx.fillStyle = '#1f6b39'; ctx.fillText(s, W / 2, ty);
+  ctx.restore();
+  $('btn-bottle-throw').disabled = B.cd > 0;
 }
 
 // ============================================================
@@ -1400,7 +1644,7 @@ function drawYum() {
 const FIGHT = {
   hp: 100, h: 0.36,           // 人物高度 × min(H, W × 1.5)
   moveSpeed: 0.38, bennySpeed: 0.12, dodgeSpeed: 0.55, dodgeChance: 0.3,   // 每秒 × 畫面闊度
-  specialCd: 2, koTime: 2,
+  specialCd: 2, koTime: 2, bossTurn: 28,
   punch: { dmg: 8, score: 20, time: 0.3 },
   wave: { dmg: 20, score: 100, prepare: 0.6, time: 0.4, speed: 0.9 },
   upper: { dmg: 25, score: 120, dash: 1.4, time: 0.45 },
@@ -1431,7 +1675,7 @@ const RIVAL_POSE = {
   fight_boss_punch:     { ax: 0.65,  ay: 0.955, bh: 0.98 },
   fight_boss_kick:      { ax: 0.61,  ay: 0.955, bh: 0.84 },
   fight_boss_multi:     { ax: 0.675, ay: 0.915, bh: 0.74 },
-  fight_boss_spin:      { ax: 0.55,  ay: 0.89, bh: 0.84 },
+  fight_boss_spin:      { ax: 0.50,  ay: 0.95, bh: 0.94 },
   fight_boss_prepare:   { ax: 0.525, ay: 0.945, bh: 0.92 },
   fight_boss_wave:      { ax: 0.68,  ay: 0.915, bh: 0.86 },
 };
@@ -1675,7 +1919,14 @@ function drawFight() {
   if (IMG[useKey]) {
     // 用腳底位置對齊，出招轉圖時個人唔會跳位
     const P = RIVAL_POSE[useKey] || DEFAULT_POSE, S = h / P.bh, off = (0.5 - P.ax) * S;
-    drawSprite(useKey, rx + (rFlip ? -off : off), ry + (1 - P.ay) * S, S, { flip: rFlip, rot: r.state === 'spin' ? Math.sin(game.t * 30) * 0.08 : 0 });
+    const spin = r.state === 'spin';
+    if (spin && F.who === 'boss') {
+      // 老闆娘旋風腳：左右反轉，轉到側面收窄，似真係轉緊圈
+      const turn = Math.cos(game.t * FIGHT.bossTurn);
+      drawSprite(useKey, rx, ry + (1 - P.ay) * S, S, { flip: turn < 0, sx: Math.max(0.3, Math.abs(turn)) });
+    } else {
+      drawSprite(useKey, rx + (rFlip ? -off : off), ry + (1 - P.ay) * S, S, { flip: rFlip, rot: spin ? Math.sin(game.t * 30) * 0.08 : 0 });
+    }
   } else drawRivalPlaceholder(rx, ry, h, r.state, rFlip, F.who);
 
   // 鑊氣波／氣功掌
@@ -2276,7 +2527,7 @@ function showResult() {
   const best = parseInt(store.get('kdyz-best', '0'), 10) || 0;
   const isNew = total > best;
   if (isNew) store.set('kdyz-best', String(total));
-  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0, fightKOs: M.fightKOs || 0, yumFoods: M.yumFoods || 0 };
+  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0, fightKOs: M.fightKOs || 0, yumFoods: M.yumFoods || 0, bottleHits: M.bottleHits || 0 };
 
   $('res-main').textContent = fmt(game.score);
   $('res-time-label').textContent = `用時加分（${game.elapsed.toFixed(1)} 秒）`;
@@ -2292,7 +2543,7 @@ function showResult() {
 
 function shareText() {
   const r = lastResult;
-  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '') + (r.fightKOs ? `\n街坊對打 KO 咗佢 ${r.fightKOs} 次 🥊` : '') + (r.yumFoods ? `\n飲茶逼佢食咗 ${r.yumFoods} 碟點心 🥢` : '');
+  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '') + (r.fightKOs ? `\n街坊對打 KO 咗佢 ${r.fightKOs} 次 🥊` : '') + (r.yumFoods ? `\n飲茶逼佢食咗 ${r.yumFoods} 碟點心 🥢` : '') + (r.bottleHits ? `\n爆樽掟中佢 ${r.bottleHits} 下 🍾` : '');
   return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈${ifc}\n你夠唔夠我快？`;
 }
 
@@ -2365,6 +2616,8 @@ function frame(now) {
     updateFight(dt);
   } else if (game.phase === 'yum' && game.yum) {
     updateYum(dt);
+  } else if (game.phase === 'bottle' && game.bottle) {
+    updateBottle(dt);
   }
   render(dt);
 }
@@ -2389,6 +2642,8 @@ function render(dt) {
     drawFight();
   } else if (game.phase === 'yum' && game.yum) {
     drawYum();
+  } else if (game.phase === 'bottle' && game.bottle) {
+    drawBottle();
   } else {
     drawPunish();
   }
@@ -2451,13 +2706,15 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 function pause(p) {
   if (!game || ['done'].includes(game.phase)) return;
-  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel', 'fight', 'yum'].includes(game.phase);
+  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel', 'fight', 'yum', 'bottle'].includes(game.phase);
   const v = $('ifc-video'), videoOn = !$('ifc-video-layer').classList.contains('hidden');
   if (p && playing && !game.paused) {
     game.paused = true; Sound.suspend(); show('scr-pause');
+    if (game.phase === 'bottle') Sound.bottlePause();
     if (videoOn) v.pause();
   } else if (!p && game.paused) {
     game.paused = false; Sound.resume(); hide('scr-pause');
+    if (game.phase === 'bottle') Sound.bottleResume();
     if (videoOn) v.play().catch(() => {});
   }
 }
@@ -2500,6 +2757,10 @@ $('btn-animal-spare').addEventListener('click', () => { if (game && game.phase =
 $('btn-yum').addEventListener('click', afterImages(startYum));
 $('btn-yum-serve').addEventListener('click', yumServe);
 $('btn-yum-spare').addEventListener('click', () => { if (game && game.phase === 'yum') endYum(); });
+$('btn-bottle').addEventListener('click', afterImages(startBottle));
+$('btn-bottle-throw').addEventListener('click', bottleThrow);
+$('btn-bottle-swap').addEventListener('click', bottleSwap);
+$('btn-bottle-spare').addEventListener('click', bottleFinish);
 $('btn-fight').addEventListener('click', afterImages(startFight));
 $('btn-fight-punch').addEventListener('click', fightPunch);
 $('btn-fight-wave').addEventListener('click', fightWave);

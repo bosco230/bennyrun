@@ -140,6 +140,29 @@ html, body {
   font-size: 15px; font-weight: 900; padding: 6px 18px; border-radius: 999px;
 }
 #btn-fight-swap { border-color: #7a4fd0; color: #533396; }
+#btn-bottle {
+  position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 102px);
+  z-index: 6; border: 0; cursor: pointer; font-family: inherit;
+  background: #2f8f4e; color: #fff; font-size: 17px; font-weight: 900;
+  padding: 9px 16px; border-radius: 999px; box-shadow: 0 4px 0 #1f6b39;
+}
+#btn-bottle:active { transform: translateY(3px); box-shadow: 0 1px 0 #1f6b39; }
+#bottle-hud {
+  position: fixed; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0 12px; pointer-events: none;
+}
+#bottle-hud button { pointer-events: auto; cursor: pointer; font-family: inherit; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+#btn-bottle-throw {
+  border: 0; font-weight: 900; font-size: 24px; background: #2f8f4e; color: #fff;
+  padding: 13px 44px; border-radius: 999px; box-shadow: 0 5px 0 #1f6b39;
+}
+#btn-bottle-throw:active { transform: translateY(3px); box-shadow: 0 2px 0 #1f6b39; }
+.bottle-bottom { display: flex; gap: 10px; justify-content: center; }
+#btn-bottle-spare, #btn-bottle-swap {
+  border: 3px solid var(--blue); background: rgba(255,255,255,.94); color: var(--ink);
+  font-size: 16px; font-weight: 900; padding: 8px 20px; border-radius: 999px;
+}
+#btn-bottle-swap { border-color: #2f8f4e; color: #1f6b39; }
 #animal-hud {
   position: fixed; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 6;
   display: flex; justify-content: center; pointer-events: none;
