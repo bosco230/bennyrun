@@ -85,6 +85,23 @@ const IMG_SRC = {
   yum_food4: 'assets/yumcha/food4.png',
   yum_food5: 'assets/yumcha/food5.png',
   yum_food6: 'assets/yumcha/food6.png',
+  grave_bg: 'assets/grave/bg.jpg',
+  grave_stand: 'assets/grave/stand.webp',
+  grave_zom: 'assets/grave/zom.webp',
+  grave_cn: 'assets/grave/cn.webp',
+  grave_agg: 'assets/grave/agg.webp',
+  grave_catch: 'assets/grave/catch.webp',
+  grave_stand_burn: 'assets/grave/stand_burn.webp',
+  grave_zom_burn: 'assets/grave/zom_burn.webp',
+  grave_cn_burn: 'assets/grave/cn_burn.webp',
+  grave_agg_burn: 'assets/grave/agg_burn.webp',
+  grave_catch_burn: 'assets/grave/catch_burn.webp',
+  grave_flame: 'assets/grave/flame.png',
+  grave_flame_idle: 'assets/grave/flame_idle.png',
+  grave_gun: 'assets/grave/gun.png?v=2',
+  grave_shotgun: 'assets/grave/shotgun.png',
+  grave_grenade: 'assets/grave/grenade.png',
+  grave_heal: 'assets/grave/heal.png',
   bottle_bg: 'assets/bottle/bg.jpg',
   bottle_walk1: 'assets/bottle/walk1.png',
   bottle_walk2: 'assets/bottle/walk2.png',
@@ -313,7 +330,7 @@ window.addEventListener('resize', resize);
 // ============================================================
 const IMG = {};
 // 公園主關要用嘅圖先載入；懲罰相、IFC 天台、燒碳嘅圖等開始畫面出咗之後喺背景慢慢載，手機開得快啲
-const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_|fight_|yum_|bottle_)/.test(k);
+const isLateImage = (k) => /^(benny_idle|benny_hit|ifc_|burn_|animal_|brothel_|fight_|yum_|bottle_|grave_)/.test(k);
 function loadImages(keys, showProgress) {
   let done = 0;
   return Promise.all(keys.map((k) => new Promise((res) => {
@@ -387,15 +404,16 @@ const Sound = {
     this.fightVoices = FIGHT_VOICES.map((src) => { const a = new Audio(src); a.preload = 'auto'; return a; });
     this.yumVoices = YUM_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.bottleHits = BOTTLE_HITS.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
+    this.graveVoices = GRAVE_VOICES.map((v) => { const a = new Audio(v.src); a.preload = 'auto'; return a; });
     this.bottleMusics = {};
     Object.entries(BOTTLE_MUSIC).forEach(([k, src]) => { const a = new Audio(src); a.preload = 'auto'; this.bottleMusics[k] = a; });
-    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices, ...this.fightVoices, ...this.yumVoices, ...this.bottleHits, ...Object.values(this.bottleMusics)].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
+    [...this.voices, ...this.ifcVoices, ...this.burnVoices, ...this.animalVoices, ...this.brothelVoices, ...this.fightVoices, ...this.yumVoices, ...this.graveVoices, ...this.bottleHits, ...Object.values(this.bottleMusics)].forEach((a) => { a.muted = true; const p = a.play(); if (p) p.then(() => { a.pause(); a.currentTime = 0; a.muted = this.muted; }).catch(() => { a.muted = this.muted; }); });
   },
 
   setMuted(m) {
     this.muted = m; store.set('kdyz-muted', m ? '1' : '0');
     if (this.master) this.master.gain.value = m ? 0 : 1;
-    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || []), ...(this.fightVoices || []), ...(this.yumVoices || []), ...(this.bottleHits || []), ...Object.values(this.bottleMusics || {})].forEach((a) => { a.muted = m; });
+    [...this.voices, ...(this.ifcVoices || []), ...(this.burnVoices || []), ...(this.animalVoices || []), ...(this.brothelVoices || []), ...(this.fightVoices || []), ...(this.yumVoices || []), ...(this.graveVoices || []), ...(this.bottleHits || []), ...Object.values(this.bottleMusics || {})].forEach((a) => { a.muted = m; });
     const v = document.getElementById('ifc-video'); if (v) v.muted = m;
     $('btn-mute').textContent = m ? '🔇' : '🔊';
   },
@@ -431,6 +449,46 @@ const Sound = {
     const a = this.yumVoices && this.yumVoices[i];
     if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
     return YUM_VOICES[i].text;
+  },
+
+  // 墳墓背景音樂：冇音樂檔，用合成：低音持續 + 慢慢開合嘅濾波，再間中一下鐘聲同風聲
+  graveMusic(on) {
+    if (!this.ac) return;
+    if (!on) {
+      const n = this.graveNodes; this.graveNodes = null;
+      if (n) { n.out.gain.setTargetAtTime(0, this.ac.currentTime, 0.1); n.oscs.forEach((o) => o.stop(this.ac.currentTime + 0.6)); }
+      return;
+    }
+    if (this.graveNodes) return;
+    const ac = this.ac, t = ac.currentTime, out = ac.createGain(), lp = ac.createBiquadFilter();
+    out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(0.22, t + 2);
+    lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 4;
+    const lfo = ac.createOscillator(), lfoG = ac.createGain();
+    lfo.frequency.value = 0.11; lfoG.gain.value = 170; lfo.connect(lfoG).connect(lp.frequency);
+    const oscs = [lfo, ...[['sawtooth', 55], ['sawtooth', 55.5], ['triangle', 58.27], ['sine', 82.41]].map(([type, f]) => {
+      const o = ac.createOscillator(); o.type = type; o.frequency.value = f; o.connect(lp); return o;
+    })];
+    lp.connect(out).connect(this.master);
+    oscs.forEach((o) => o.start());
+    this.graveNodes = { out, oscs };
+  },
+  // 墳墓射中語音：隨機、唔連續重複；啱啱開始播嗰句唔會即刻被截斷
+  graveVoice() {
+    const now = performance.now();
+    if (now - (this.graveAt || 0) < 900 && (this.graveVoices || []).some((a) => !a.paused)) return null;
+    this.graveAt = now;
+    let i; do { i = Math.floor(Math.random() * GRAVE_VOICES.length); } while (i === this.lastGrave && GRAVE_VOICES.length > 1);
+    this.lastGrave = i;
+    (this.graveVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+    const a = this.graveVoices && this.graveVoices[i];
+    if (a) { try { a.currentTime = 0; const p = a.play(); if (p) p.catch(() => {}); } catch (e) { /* 忽略 */ } }
+    return GRAVE_VOICES[i].text;
+  },
+  graveBell() {
+    if (!this.graveNodes) return;
+    if (Math.random() < 0.35) { this.noise(2.2, 0.1, 480, 0, 0.5); return; }
+    const f = pick([220, 233.08, 277.18, 329.63, 349.23]);
+    this.tone('sine', f, 0, 2.6, 0.13); this.tone('sine', f * 2.01, 0, 1.6, 0.04);
   },
 
   // 爆樽音樂：入場、背景（不停循環）、完結，同一時間只播一首
@@ -540,6 +598,16 @@ const Sound = {
       case 'glass': this.noise(0.22, 0.55, 5200, 0, 0.8); this.tone('triangle', 2400, 1200, 0.12, 0.14); this.tone('triangle', 3300, 1800, 0.1, 0.1, 0.04); break;
       case 'wood': this.tone('sine', 150, 60, 0.18, 0.55); this.noise(0.1, 0.45, 900, 0, 1); break;
       case 'throw': this.noise(0.18, 0.16, 1400, 0, 0.7); break;
+      case 'pistol': this.noise(0.1, 0.8, 2400, 0, 0.7); this.tone('square', 240, 70, 0.1, 0.22); break;
+      case 'shotgun': this.noise(0.3, 1, 900, 0, 0.5); this.tone('sawtooth', 140, 40, 0.28, 0.4); break;
+      case 'reload': this.tone('square', 900, 700, 0.04, 0.14); this.tone('square', 650, 500, 0.05, 0.16, 0.12); break;
+      case 'empty': this.tone('square', 1400, 1100, 0.03, 0.12); break;
+      case 'boom': this.noise(0.9, 1, 260, 0, 0.5); this.tone('sine', 100, 28, 0.8, 0.8); break;
+      case 'bite': this.tone('sawtooth', 170, 60, 0.3, 0.32); this.noise(0.2, 0.5, 700, 0, 1); break;
+      case 'growl': this.tone('sawtooth', 95, 55, 0.35, 0.24); this.tone('sawtooth', 102, 60, 0.3, 0.18, 0.02); break;
+      case 'blast': this.noise(0.45, 0.85, 420, 0, 0.6); this.tone('sine', 130, 38, 0.42, 0.55); break;
+      case 'flame': this.noise(0.45, 0.6, 620, 0, 0.5); this.noise(0.3, 0.25, 2200, 0, 0.6); break;
+      case 'heal': [523, 784, 1046].forEach((f, i) => this.tone('sine', f, 0, 0.2, 0.22, i * 0.06)); break;
     }
   },
 
@@ -1293,7 +1361,7 @@ function drawIfc() {
 }
 
 // 小遊戲分數：加入懲罰分，同時逐個記低，結算時列明細（玩過就有一行，0 分都有）
-const MINI_NAMES = { ifc: 'IFC 天台', burn: '燒碳', animal: '蛇蟲鼠蟻', brothel: '妓寨', fight: '街坊對打', yum: '飲茶', bottle: '爆樽' };
+const MINI_NAMES = { ifc: 'IFC 天台', burn: '燒碳', animal: '蛇蟲鼠蟻', brothel: '妓寨', fight: '街坊對打', yum: '飲茶', bottle: '爆樽', grave: '墳墓' };
 function miniAdd(name, add) {
   const M = game.mini;
   M.score += add; M.parts[name] = (M.parts[name] || 0) + add;
@@ -1301,7 +1369,372 @@ function miniAdd(name, add) {
 
 // 懲罰畫面三個掣（完成、IFC 天台、燒碳）一齊出、一齊收
 function punishButtons(on) {
-  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight', 'btn-yum', 'btn-bottle'].forEach((id) => (on ? show(id) : hide(id)));
+  ['btn-done', 'btn-ifc', 'btn-burn', 'btn-animal', 'btn-brothel', 'btn-fight', 'btn-yum', 'btn-bottle', 'btn-grave'].forEach((id) => (on ? show(id) : hide(id)));
+}
+
+// ============================================================
+// 墳墓：射擊遊戲。場上 3–4 個袁枝左右行，撳畫面開槍。
+// 人 → 第一層喪屍 → 隨機變中國殭屍（跳三下埋身）或者西方喪屍（兩層，每層行前一步）。
+// 埋身會攻擊畫面扣一格能源。冇盡頭，撳「返回」先走
+// ============================================================
+const GRAVE = {
+  farY: 0.72, nearY: 0.88, baseH: 0.34, speed: 0.32,   // 地面高度（背景相比例）、身高、行速
+  weapons: {
+    // lenW／lenH：槍身最長幾多（畫面比例）；muzzle：槍口離轉軸幾遠（槍長比例）；shift：張圖有火焰，將槍身移返中間
+    // barrel：槍管高過圖片中線幾多（圖高比例），咁樣槍管先會對準瞄緊嘅位；below：轉軸離操作掣幾高（槍長比例）
+    pistol: { key: 'grave_gun', name: '手槍', ammo: 4, reload: 0.6, gap: 0.16, radius: 0, sfx: 'pistol', lenW: 0.42, lenH: 0.24, muzzle: 0.5, shift: 0, barrel: 0.3, below: 0.46 },
+    shotgun: { key: 'grave_shotgun', name: '散彈槍', ammo: 1, reload: 1.6, gap: 0.4, radius: 0.2, sfx: 'shotgun', lenW: 0.6, lenH: 0.34, muzzle: 0.5, shift: 0, barrel: 0.3, below: 0.4 },
+    // 噴火槍：中咗變燒焦圖，同散彈槍一樣升一層
+    flame: { key: 'grave_flame_idle', fireKey: 'grave_flame', name: '噴火槍', ammo: 3, reload: 1, gap: 0.35, radius: 0.13, burn: true, sfx: 'flame', lenW: 0.7, lenH: 0.4, muzzle: 0.08, shift: 0.12, barrel: 0.12, below: 0.56 },
+  },
+  order: ['pistol', 'shotgun', 'flame'],
+  energy: 5, grenades: 3, nadeTime: 0.6,
+  hitScore: 20, killScore: 50,
+  hopTime: 0.8, hops: 3, hopStep: 0.24,    // 中國殭屍：跳三下，每下行前
+  step: 0.2, aggWait: 2.5, catchWait: 1.9, // 西方喪屍：第二層等一陣自動變第三層，每變一層行前一步，第三層等一陣就攻擊
+  lunge: 0.45, blastTime: 0.45,
+  healEvery: [10, 18], healLife: 5,
+  keys: { human: 'grave_stand', zom: 'grave_zom', cn: 'grave_cn', agg: 'grave_agg', catch: 'grave_catch' },
+  burnKeys: { human: 'grave_stand_burn', zom: 'grave_zom_burn', cn: 'grave_cn_burn', agg: 'grave_agg_burn', catch: 'grave_catch_burn' },
+};
+
+const GRAVE_VOICES = [
+  { src: 'assets/grave/grave_v1.m4a', text: '妖孽，還不現形' },
+  { src: 'assets/grave/grave_v2.m4a', text: '唔好過嚟啊，救命呀' },
+  { src: 'assets/grave/grave_v3.m4a', text: '師傅，今次真係大鑊啦' },
+  { src: 'assets/grave/grave_v4.m4a', text: '天地無極，乾坤借法' },
+  { src: 'assets/grave/grave_v5.m4a', text: '死啦死啦，我俾佢咬中' },
+];
+
+function graveLayout() {
+  const im = IMG.grave_bg, iw = im ? im.width : 1672, ih = im ? im.height : 941;
+  const s = Math.max(W / iw, H / ih), h = ih * s, y = (H - h) / 2;
+  const hudEl = $('grave-hud'), hudTop = hudEl.classList.contains('hidden') ? H - 120 : hudEl.getBoundingClientRect().top;
+  const near = Math.min(y + GRAVE.nearY * h, hudTop - H * 0.08);
+  return { far: Math.min(y + GRAVE.farY * h, near - H * 0.08), near, h: Math.min(H * GRAVE.baseH, W * 0.75), hudTop };
+}
+
+function graveSpawn(B, u) {
+  B.chars.push({ u: u === undefined ? rand(0.12, 0.88) : u, z: rand(0, 0.25), zTo: 0, dir: Math.random() < 0.5 ? -1 : 1, kind: 'human', T: 0, hop: 0, hopT: 0, rise: 0, flash: 0, lungeT: -1, dead: -1, sway: rand(0, 6) });
+  const c = B.chars[B.chars.length - 1]; c.zTo = c.z;
+  return c;
+}
+
+function startGrave() {
+  if (!game || game.phase !== 'punish' || game.paused) return;
+  punishButtons(false); show('grave-hud');
+  const B = game.grave = { t: 0, chars: [], want: 3 + (Math.random() < 0.5 ? 1 : 0), spawnT: 0, weapon: 'pistol', ammo: { pistol: GRAVE.weapons.pistol.ammo, shotgun: GRAVE.weapons.shotgun.ammo, flame: GRAVE.weapons.flame.ammo }, cd: 0, reloadT: 0, recoil: 0, flashT: 0, aim: null, tracer: [], bits: [], blasts: [], energy: GRAVE.energy, grenades: GRAVE.grenades, nade: null, boomT: 0, heal: null, healT: rand(...GRAVE.healEvery), score: 0, kills: 0, deaths: 0, bellT: 1.5, biteT: 0 };
+  game.phase = 'grave';
+  graveSpawn(B, 0.5);
+  while (B.chars.length < B.want) graveSpawn(B);
+  Sound.graveMusic(true);
+  graveButtons();
+}
+
+function endGrave() {
+  const B = game.grave, M = game.mini;
+  game.phase = 'punish'; game.grave = null;
+  hide('grave-hud'); punishButtons(true); Sound.graveMusic(false);
+  (Sound.graveVoices || []).forEach((a) => { if (!a.paused) a.pause(); });
+  miniAdd('grave', B.score);
+  if (B.score > 0) { M.graveKills = (M.graveKills || 0) + B.kills; floatText(`墳墓 +${B.score}`, W / 2, H * 0.4, '#6b5bb5', 1.3); }
+}
+
+function graveButtons() {
+  const B = game && game.grave;
+  if (!B) return;
+  const nade = `💣 手榴彈 ×${B.grenades}`;
+  if ($('btn-grave-nade').textContent !== nade) $('btn-grave-nade').textContent = nade;
+  $('btn-grave-nade').disabled = B.grenades <= 0 || !!B.nade;
+}
+
+// 冇子彈就自動裝彈：手槍快、散彈槍慢
+function graveAutoReload(B) {
+  if (B.ammo[B.weapon] > 0 || B.reloadT > 0) return;
+  B.reloadT = GRAVE.weapons[B.weapon].reload; Sound.sfx('reload');
+}
+
+function graveCharBox(c, L) {
+  const key = (c.burnt ? GRAVE.burnKeys : GRAVE.keys)[c.kind], grow = 0.78 + 0.5 * c.z, lunge = c.lungeT >= 0 ? 1 + 1.7 * Math.min(1, c.lungeT / GRAVE.lunge) : 1;
+  const dh = L.h * grow * lunge, dw = dh * aspect(key);
+  let fy = L.far + (L.near - L.far) * Math.min(1, c.z);
+  if (c.kind === 'cn' && c.hopT > 0) fy -= Math.sin(Math.PI * Math.min(1, c.hopT / GRAVE.hopTime)) * L.h * 0.22;
+  return { key, x: c.u * W, fy, dh, dw };
+}
+
+function graveBits(B, x, y, n, colors) {
+  for (let i = 0; i < n; i++) B.bits.push({ x, y, vx: rand(-220, 220), vy: rand(-300, -30), r: rand(2, 5), c: pick(colors), t: 0, life: rand(0.35, 0.7) });
+}
+
+function graveKill(B, c) {
+  c.dead = 0; c.lungeT = -1; B.kills++; B.score += GRAVE.killScore;
+  const b = graveCharBox(c, graveLayout());
+  floatText(`+${GRAVE.killScore}`, b.x, b.fy - b.dh, '#ffd45c', 1);
+}
+
+// 中一槍：跟住佢而家係咩就變下一層
+// advance：散彈槍同噴火槍，第二層唔會死，會升上第三層；已經冇下一層先死
+function graveHit(B, c, L, advance = false) {
+  const b = graveCharBox(c, L);
+  graveBits(B, b.x, b.fy - b.dh * 0.6, 12, ['#8a0f14', '#c01a22', '#5a0a0d']);
+  c.flash = 0.15;
+  const said = Sound.graveVoice();
+  if (said) B.bubble = { text: said, x: b.x, y: b.fy - b.dh, t: 1.4 };
+  if (c.kind === 'cn' || c.kind === 'catch' || (c.kind === 'agg' && !advance)) { graveKill(B, c); return; }
+  B.score += GRAVE.hitScore;
+  floatText(`+${GRAVE.hitScore}`, b.x, b.fy - b.dh, '#ffd45c', 0.9);
+  Sound.sfx('growl');
+  if (c.kind === 'human') {
+    c.kind = 'zom';
+  } else if (c.kind === 'zom') {
+    if (Math.random() < 0.5) { c.kind = 'cn'; c.hop = 0; c.hopT = 0.001; } else { c.kind = 'agg'; c.zTo += GRAVE.step; c.T = GRAVE.aggWait; }
+  } else if (c.kind === 'agg') {
+    graveToCatch(c);
+  }
+}
+
+function graveToCatch(c) {
+  c.kind = 'catch'; c.zTo += GRAVE.step; c.T = GRAVE.catchWait;
+}
+
+function graveFire(x, y) {
+  const B = game.grave, w = GRAVE.weapons[B.weapon];
+  B.aim = { x, y };
+  if (B.reloadT > 0 || B.cd > 0 || B.ammo[B.weapon] <= 0) { if (B.reloadT > 0) Sound.sfx('empty'); return; }
+  B.ammo[B.weapon]--; B.cd = w.gap; B.recoil = 1; B.flashT = w.burn ? 0.3 : 0.07;
+  Sound.sfx(w.sfx);
+  const L = graveLayout(), alive = B.chars.filter((c) => c.dead < 0 && c.rise >= 0.3);
+  if (w.radius) {
+    // 散彈槍：範圍內全部爆炸。噴火槍：範圍內全部燒焦。兩支都係打中升一層
+    const R = U * w.radius;
+    B.tracer.push({ x, y, r: R, t: 0 });
+    if (w.burn) graveBits(B, x, y, 24, ['#ffb030', '#ff6a20', '#ffe9a8']);
+    for (const c of alive) {
+      const b = graveCharBox(c, L), cy = b.fy - b.dh * 0.55;
+      const dx = Math.max(0, Math.abs(x - b.x) - b.dw * 0.4), dy = Math.max(0, Math.abs(y - cy) - b.dh * 0.45);
+      if (dx * dx + dy * dy > R * R) continue;
+      // 噴中未燒焦嘅人：先變燒焦人，呢下唔升層；再中先變喪屍
+      if (w.burn && c.kind === 'human' && !c.burnt) { c.burnt = true; continue; }
+      if (w.burn) c.burnt = true;
+      else {
+        // 散彈槍：中嗰個爆炸
+        B.blasts.push({ x: b.x, y: cy, r: b.dh * 0.5, t: 0, seed: rand(0, 6) });
+        graveBits(B, b.x, cy, 26, ['#ffb030', '#ff6a20', '#8a0f14', '#c01a22', '#2a2a2a']);
+      }
+      graveHit(B, c, L, true);
+    }
+    if (!w.burn && B.blasts.some((m) => m.t === 0)) { Sound.sfx('blast'); game.shake = Math.max(game.shake, 0.35); }
+  } else {
+    // 手槍：打最前嗰個
+    B.tracer.push({ x, y, r: U * 0.03, t: 0 });
+    const hit = alive.slice().sort((a, b) => b.z - a.z).find((c) => {
+      const b = graveCharBox(c, L);
+      return Math.abs(x - b.x) <= b.dw * 0.42 && y <= b.fy && y >= b.fy - b.dh;
+    });
+    if (hit) graveHit(B, hit, L);
+  }
+  graveAutoReload(B);
+}
+
+function onGraveTap(x, y) {
+  const B = game.grave;
+  if (B.heal && Math.hypot(x - B.heal.x * W, y - B.heal.y * H) < Math.max(52, U * 0.09)) {
+    B.heal = null; Sound.sfx('heal');
+    if (B.energy < GRAVE.energy) B.energy++;
+    floatText('+1 能源', x, y - U * 0.04, '#39d98a', 1.2);
+    return;
+  }
+  graveFire(x, y);
+}
+
+function graveSwap() {
+  const B = game && game.grave;
+  if (!B) return;
+  B.weapon = GRAVE.order[(GRAVE.order.indexOf(B.weapon) + 1) % GRAVE.order.length]; B.reloadT = 0; B.cd = 0;
+  Sound.sfx('reload'); graveAutoReload(B);
+}
+
+function graveGrenade() {
+  const B = game && game.grave;
+  if (!B || B.grenades <= 0 || B.nade) return;
+  B.grenades--; B.nade = { t: 0 }; Sound.sfx('throw'); graveButtons();
+}
+
+function updateGrave(dt) {
+  const B = game.grave, L = graveLayout();
+  B.t += dt; B.cd = Math.max(0, B.cd - dt); B.recoil = Math.max(0, B.recoil - dt * 6); B.flashT = Math.max(0, B.flashT - dt); B.boomT = Math.max(0, B.boomT - dt); B.biteT = Math.max(0, B.biteT - dt);
+  if (B.bubble && (B.bubble.t -= dt) <= 0) B.bubble = null;
+  if ((B.bellT -= dt) <= 0) { Sound.graveBell(); B.bellT = rand(2.2, 5); }
+  if (B.reloadT > 0 && (B.reloadT -= dt) <= 0) { B.reloadT = 0; B.ammo[B.weapon] = GRAVE.weapons[B.weapon].ammo; Sound.sfx('count'); }
+
+  if (B.nade && (B.nade.t += dt) >= GRAVE.nadeTime) {
+    B.nade = null; B.boomT = 0.6; game.shake = 0.6; Sound.sfx('boom');
+    game.flash = { t: 0.12, color: 'rgba(255,240,200,.8)' };
+    for (const c of B.chars) if (c.dead < 0) graveKill(B, c);
+    graveBits(B, W / 2, H * 0.55, 60, ['#ffb030', '#ff6a20', '#555', '#222']);
+    graveButtons();
+  }
+
+  // 補血包：隨機出現，幾秒後消失
+  if (B.heal) { if ((B.heal.t -= dt) <= 0) B.heal = null; } else if ((B.healT -= dt) <= 0) {
+    B.heal = { x: rand(0.15, 0.85), y: (L.far - rand(0, 0.12) * H) / H, t: GRAVE.healLife }; B.healT = rand(...GRAVE.healEvery);
+  }
+
+  const speed = GRAVE.speed * L.h / W;
+  for (const c of B.chars) {
+    c.flash = Math.max(0, c.flash - dt); c.sway += dt * 5;
+    if (c.dead >= 0) { c.dead += dt; continue; }
+    c.rise = Math.min(1, c.rise + dt * 2.5);
+    c.z += (c.zTo - c.z) * Math.min(1, dt * 6);
+    if (c.lungeT >= 0) {
+      c.lungeT += dt;
+      if (c.lungeT >= GRAVE.lunge) {
+        // 攻擊畫面：扣一格能源，之後走咗
+        c.dead = 9; B.energy--; B.biteT = 0.4; game.shake = 0.4; Sound.sfx('bite');
+        game.flash = { t: 0.18, color: 'rgba(170,10,20,.55)' };
+        floatText('-1 能源', W / 2, H * 0.4, '#ff5a5a', 1.5);
+        if (B.energy <= 0) { B.energy = GRAVE.energy; B.deaths++; floatText('能源耗盡！回滿再嚟', W / 2, H * 0.5, '#ff5a5a', 1); }
+      }
+      continue;
+    }
+    if (c.kind === 'cn') {
+      // 跳三下，每下行前同埋行向中間
+      c.hopT += dt;
+      c.u += (0.5 - c.u) * Math.min(1, dt * 0.6);
+      if (c.hopT >= GRAVE.hopTime) {
+        c.hopT = 0.001; c.hop++; c.zTo += GRAVE.hopStep; Sound.sfx('miss');
+        if (c.hop >= GRAVE.hops) { c.hopT = 0; c.lungeT = 0; Sound.sfx('growl'); }
+      }
+    } else if (c.kind === 'catch') {
+      if ((c.T -= dt) <= 0) { c.lungeT = 0; Sound.sfx('growl'); }
+    } else {
+      if (c.kind === 'agg' && (c.T -= dt) <= 0) { graveToCatch(c); Sound.sfx('growl'); continue; }
+      c.u += c.dir * speed * dt * (c.kind === 'agg' ? 1.25 : 1);
+      if (c.u <= 0.1) { c.u = 0.1; c.dir = 1; } else if (c.u >= 0.9) { c.u = 0.9; c.dir = -1; } else if (Math.random() < 0.2 * dt) c.dir *= -1;
+    }
+  }
+  B.chars = B.chars.filter((c) => c.dead < 0.55);
+
+  // 死咗就補人，維持三至四個
+  const alive = B.chars.filter((c) => c.dead < 0).length;
+  if (alive < B.want) { if ((B.spawnT -= dt) <= 0) { graveSpawn(B); B.spawnT = rand(0.5, 1.2); if (alive + 1 >= B.want) B.want = 3 + (Math.random() < 0.5 ? 1 : 0); } } else B.spawnT = 0.6;
+
+  B.tracer = B.tracer.filter((m) => (m.t += dt) < 0.2);
+  B.blasts = B.blasts.filter((m) => (m.t += dt) < GRAVE.blastTime);
+  B.bits = B.bits.filter((b) => { b.t += dt; b.vy += 800 * dt; b.x += b.vx * dt; b.y += b.vy * dt; return b.t < b.life; });
+  graveButtons();
+}
+
+function drawGraveGun(B, L) {
+  const w = GRAVE.weapons[B.weapon], firing = B.flashT > 0;
+  // 噴火槍開火時換連火焰嗰張
+  const im = IMG[w.fireKey && firing ? w.fireKey : w.key];
+  if (!im) return;
+  const len = Math.min(W * w.lenW, H * w.lenH), gx = W / 2, gy = L.hudTop - len * w.below;
+  const ax = B.aim ? B.aim.x : gx, ay = B.aim ? Math.min(B.aim.y, gy - 10) : gy - 100;
+  const ang = Math.atan2(ay - gy, ax - gx), kick = B.recoil * len * 0.1;
+  ctx.save(); ctx.translate(gx - Math.cos(ang) * kick, gy - Math.sin(ang) * kick);
+  if (firing && !w.burn) {
+    const mz = len * (w.muzzle + 0.06), r = U * (B.weapon === 'pistol' ? 0.06 : 0.1);
+    const g = ctx.createRadialGradient(Math.cos(ang) * mz, Math.sin(ang) * mz, 0, Math.cos(ang) * mz, Math.sin(ang) * mz, r);
+    g.addColorStop(0, 'rgba(255,250,210,1)'); g.addColorStop(0.5, 'rgba(255,170,50,.8)'); g.addColorStop(1, 'rgba(255,90,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(Math.cos(ang) * mz, Math.sin(ang) * mz, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // 三支槍原圖槍口都向左；瞄右邊就鏡射，唔會反轉
+  const gh = len / aspectOf(im);
+  if (ax > gx) { ctx.rotate(ang); ctx.scale(-1, 1); } else ctx.rotate(ang - Math.PI);
+  ctx.drawImage(im, -len / 2 + w.shift * len, -gh / 2 + w.barrel * gh, len, gh);
+  ctx.restore();
+  return { gx, gy, len };
+}
+
+function drawGrave() {
+  const B = game.grave, L = graveLayout();
+  drawCover('grave_bg');
+  ctx.fillStyle = 'rgba(10,20,50,.18)'; ctx.fillRect(0, 0, W, H);
+
+  // 補血包：微微脹縮，就消失前閃
+  if (B.heal && IMG.grave_heal) {
+    const im = IMG.grave_heal, hw = Math.max(72, U * 0.13) * (1 + Math.sin(B.t * 6) * 0.06), hh = hw / aspectOf(im);
+    ctx.save(); ctx.globalAlpha = B.heal.t < 1 ? 0.4 + 0.6 * Math.abs(Math.sin(B.t * 10)) : 1;
+    ctx.drawImage(im, B.heal.x * W - hw / 2, B.heal.y * H - hh / 2, hw, hh);
+    ctx.restore();
+  }
+
+  // 由遠至近畫
+  for (const c of B.chars.slice().sort((a, b) => a.z - b.z)) {
+    if (c.dead >= 9) continue;
+    const b = graveCharBox(c, L), walking = c.lungeT < 0 && (c.kind === 'human' || c.kind === 'zom' || c.kind === 'agg');
+    // 中槍閃一下；死咗就邊倒邊淡出
+    const alpha = c.dead >= 0 ? Math.max(0, 1 - c.dead / 0.55) : (c.flash > 0 ? 0.45 : c.rise), rot = c.dead >= 0 ? c.dead * 1.6 : (walking ? Math.sin(c.sway) * 0.03 : 0);
+    drawSprite(b.key, b.x, b.fy - (walking ? Math.abs(Math.sin(c.sway)) * L.h * 0.012 : 0), b.dh, { alpha, rot });
+  }
+  if (B.bubble) drawBubble(B.bubble.text, B.bubble.x, B.bubble.y, '#6b5bb5');
+
+  for (const b of B.bits) { ctx.save(); ctx.fillStyle = b.c; ctx.globalAlpha = 1 - b.t / b.life; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+
+  // 散彈槍爆炸：尖角火球，啱啱中嗰下最大最實，之後淡出
+  for (const m of B.blasts) {
+    const k = m.t / GRAVE.blastTime, grow = Math.min(1, k * 5), fade = k < 0.45 ? 1 : 1 - (k - 0.45) / 0.55;
+    const star = (R, spin) => {
+      ctx.beginPath();
+      for (let i = 0; i < 24; i++) {
+        const a = spin + (i / 24) * Math.PI * 2, l = R * (i % 2 ? 0.55 : 1) * (1 + 0.16 * Math.sin(m.seed + i * 2.3));
+        ctx.lineTo(m.x + Math.cos(a) * l, m.y + Math.sin(a) * l);
+      }
+      ctx.closePath(); ctx.fill();
+    };
+    const R = m.r * (0.45 + 0.55 * grow);
+    ctx.save(); ctx.globalAlpha = fade;
+    ctx.fillStyle = '#e8401a'; star(R, m.seed);
+    ctx.fillStyle = '#ff9a1f'; star(R * 0.76, m.seed + 0.4);
+    ctx.fillStyle = '#ffe36b'; star(R * 0.5, m.seed + 0.8);
+    ctx.fillStyle = '#fffbe6'; star(R * 0.26, m.seed + 1.2);
+    ctx.restore();
+  }
+
+  // 落點：手槍細圈、散彈槍大圈
+  for (const m of B.tracer) {
+    ctx.save(); ctx.globalAlpha = 1 - m.t / 0.2; ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r * (0.8 + m.t), 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+
+  // 手榴彈飛行（拋物線）同爆炸
+  if (B.nade && IMG.grave_grenade) {
+    const k = B.nade.t / GRAVE.nadeTime, s = L.h * (0.26 - 0.1 * k), im = IMG.grave_grenade;
+    const x = W / 2, y = (L.hudTop) + (H * 0.55 - L.hudTop) * k - H * 0.22 * 4 * k * (1 - k);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(B.nade.t * 9); ctx.drawImage(im, -s * aspectOf(im) / 2, -s / 2, s * aspectOf(im), s); ctx.restore();
+  }
+  if (B.boomT > 0) {
+    const k = 1 - B.boomT / 0.6, r = Math.max(W, H) * 0.75 * k;
+    const g = ctx.createRadialGradient(W / 2, H * 0.55, 0, W / 2, H * 0.55, Math.max(1, r));
+    g.addColorStop(0, `rgba(255,245,200,${1 - k})`); g.addColorStop(0.5, `rgba(255,140,30,${0.8 * (1 - k)})`); g.addColorStop(1, 'rgba(120,20,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  if (B.biteT > 0) { ctx.save(); ctx.strokeStyle = `rgba(190,0,10,${B.biteT * 2})`; ctx.lineWidth = U * 0.05; ctx.strokeRect(0, 0, W, H); ctx.restore(); }
+
+  const gun = drawGraveGun(B, L);
+
+  // 能源七格 + 分數
+  const ff = getComputedStyle(document.body).fontFamily, fs = Math.max(14, U * 0.034), top = Math.max(62, H * 0.085);
+  const n = GRAVE.energy, cw = Math.min(W * 0.085, 40), ch = cw * 0.55, gap = cw * 0.16, x0 = W / 2 - (n * cw + (n - 1) * gap) / 2;
+  for (let i = 0; i < n; i++) {
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; roundRect(x0 + i * (cw + gap) - 2, top - 2, cw + 4, ch + 4, 5); ctx.fill();
+    ctx.fillStyle = i < B.energy ? (B.energy <= 2 ? '#e8404f' : '#39d98a') : 'rgba(255,255,255,.14)'; roundRect(x0 + i * (cw + gap), top, cw, ch, 4); ctx.fill();
+  }
+  ctx.save();
+  ctx.font = `900 ${fs}px ${ff}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const s = `🪦 ${fmt(B.score)} 分 ・ 打死 ${B.kills} 隻${B.deaths ? ` ・ 死咗 ${B.deaths} 次` : ''}`;
+  ctx.lineWidth = fs * 0.24; ctx.strokeStyle = '#111'; ctx.strokeText(s, W / 2, top + ch + fs);
+  ctx.fillStyle = '#fff'; ctx.fillText(s, W / 2, top + ch + fs);
+  // 武器同子彈
+  if (gun) {
+    const w = GRAVE.weapons[B.weapon], left = B.ammo[B.weapon], txt = B.reloadT > 0 ? '裝彈中…' : `${w.name} ${left}/${w.ammo}`;
+    const tx = W * 0.2, ty = L.hudTop - fs * 1.1;
+    ctx.lineWidth = fs * 0.24; ctx.strokeStyle = '#111'; ctx.strokeText(txt, tx, ty);
+    ctx.fillStyle = B.reloadT > 0 ? '#ff9a5a' : '#ffe9a8'; ctx.fillText(txt, tx, ty);
+  }
+  ctx.restore();
 }
 
 // ============================================================
@@ -2541,7 +2974,7 @@ function showResult() {
   const best = parseInt(store.get('kdyz-best', '0'), 10) || 0;
   const isNew = total > best;
   if (isNew) store.set('kdyz-best', String(total));
-  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0, fightKOs: M.fightKOs || 0, yumFoods: M.yumFoods || 0, bottleHits: M.bottleHits || 0 };
+  lastResult = { total, secs: Math.round(game.elapsed), hits: M.hits, weapon: CFG.mini.tiers[M.topTier].name, ifcFell: !!M.ifcFell, burnSaved: !!M.burnSaved, animalThrown: M.animalThrown || 0, fightKOs: M.fightKOs || 0, yumFoods: M.yumFoods || 0, bottleHits: M.bottleHits || 0, graveKills: M.graveKills || 0 };
 
   $('res-main').textContent = fmt(game.score);
   $('res-time-label').textContent = `用時加分（${game.elapsed.toFixed(1)} 秒）`;
@@ -2567,7 +3000,7 @@ function showResult() {
 
 function shareText() {
   const r = lastResult;
-  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '') + (r.fightKOs ? `\n街坊對打 KO 咗佢 ${r.fightKOs} 次 🥊` : '') + (r.yumFoods ? `\n飲茶逼佢食咗 ${r.yumFoods} 碟點心 🥢` : '') + (r.bottleHits ? `\n爆樽掟中佢 ${r.bottleHits} 下 🍾` : '');
+  const ifc = (r.ifcFell ? '\n仲喺 IFC 天台推咗佢落去 🏙' : '') + (r.burnSaved ? '\n最後都係救返佢 🪟' : '') + (r.animalThrown ? `\n仲掟咗 ${r.animalThrown} 隻蛇蟲鼠蟻落佢度 🐍` : '') + (r.fightKOs ? `\n街坊對打 KO 咗佢 ${r.fightKOs} 次 🥊` : '') + (r.yumFoods ? `\n飲茶逼佢食咗 ${r.yumFoods} 碟點心 🥢` : '') + (r.bottleHits ? `\n爆樽掟中佢 ${r.bottleHits} 下 🍾` : '') + (r.graveKills ? `\n喺墳墓打死咗 ${r.graveKills} 隻喪屍 🪦` : '');
   return `🎯《快打袁枝》我攞咗 ${fmt(r.total)} 分！\n捉袁枝用咗 ${r.secs} 秒，連打 ${r.hits} 下，用埋${r.weapon}😈${ifc}\n你夠唔夠我快？`;
 }
 
@@ -2664,6 +3097,8 @@ function frame(now) {
     updateYum(dt);
   } else if (game.phase === 'bottle' && game.bottle) {
     updateBottle(dt);
+  } else if (game.phase === 'grave' && game.grave) {
+    updateGrave(dt);
   }
   render(dt);
 }
@@ -2690,6 +3125,8 @@ function render(dt) {
     drawYum();
   } else if (game.phase === 'bottle' && game.bottle) {
     drawBottle();
+  } else if (game.phase === 'grave' && game.grave) {
+    drawGrave();
   } else {
     drawPunish();
   }
@@ -2738,6 +3175,7 @@ canvas.addEventListener('pointerdown', (e) => {
   else if (game.phase === 'burn') onBurnTap(x, y, touch);
   else if (game.phase === 'animal') onAnimalTap(x, y);
   else if (game.phase === 'brothel' && game.brothel) onBrothelTap(x, y, touch);
+  else if (game.phase === 'grave' && game.grave) onGraveTap(x, y);
   else if (game.phase === 'punish') {
     const now = performance.now(), id = e.pointerId;
     if (lastTapByPointer[id] && now - lastTapByPointer[id] < CFG.mini.tapMinGap) return;
@@ -2752,7 +3190,7 @@ document.addEventListener('dblclick', (e) => e.preventDefault());
 
 function pause(p) {
   if (!game || ['done'].includes(game.phase)) return;
-  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel', 'fight', 'yum', 'bottle'].includes(game.phase);
+  const playing = ['main', 'zoom', 'countdown', 'punish', 'ifcIntro', 'ifc', 'ifcFall', 'ifcEnding', 'burn', 'burnSaved', 'animal', 'brothel', 'fight', 'yum', 'bottle', 'grave'].includes(game.phase);
   const v = $('ifc-video'), videoOn = !$('ifc-video-layer').classList.contains('hidden');
   if (p && playing && !game.paused) {
     game.paused = true; Sound.suspend(); show('scr-pause');
@@ -2803,6 +3241,10 @@ $('btn-animal-spare').addEventListener('click', () => { if (game && game.phase =
 $('btn-yum').addEventListener('click', afterImages(startYum));
 $('btn-yum-serve').addEventListener('click', yumServe);
 $('btn-yum-spare').addEventListener('click', () => { if (game && game.phase === 'yum') endYum(); });
+$('btn-grave').addEventListener('click', afterImages(startGrave));
+$('btn-grave-nade').addEventListener('click', graveGrenade);
+$('btn-grave-swap').addEventListener('click', graveSwap);
+$('btn-grave-back').addEventListener('click', () => { if (game && game.phase === 'grave') endGrave(); });
 $('btn-bottle').addEventListener('click', afterImages(startBottle));
 $('btn-bottle-throw').addEventListener('click', bottleThrow);
 $('btn-bottle-swap').addEventListener('click', bottleSwap);
