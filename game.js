@@ -98,6 +98,7 @@ const IMG_SRC = {
   grave_catch_burn: 'assets/grave/catch_burn.webp',
   grave_flame: 'assets/grave/flame.png',
   grave_flame_idle: 'assets/grave/flame_idle.png',
+  grave_saw: 'assets/grave/saw.png?v=2',
   grave_gun: 'assets/grave/gun.png?v=2',
   grave_shotgun: 'assets/grave/shotgun.png',
   grave_grenade: 'assets/grave/grenade.png',
@@ -613,6 +614,7 @@ const Sound = {
       case 'boom': this.noise(0.9, 1, 260, 0, 0.5); this.tone('sine', 100, 28, 0.8, 0.8); break;
       case 'bite': this.tone('sawtooth', 170, 60, 0.3, 0.32); this.noise(0.2, 0.5, 700, 0, 1); break;
       case 'growl': this.tone('sawtooth', 95, 55, 0.35, 0.24); this.tone('sawtooth', 102, 60, 0.3, 0.18, 0.02); break;
+      case 'saw': this.tone('sawtooth', 95, 140, 0.32, 0.26); this.tone('sawtooth', 190, 280, 0.32, 0.12); this.noise(0.32, 0.4, 2400, 0, 1.2); break;
       case 'blast': this.noise(0.45, 0.85, 420, 0, 0.6); this.tone('sine', 130, 38, 0.42, 0.55); break;
       case 'flame': this.noise(0.45, 0.6, 620, 0, 0.5); this.noise(0.3, 0.25, 2200, 0, 0.6); break;
       case 'heal': [523, 784, 1046].forEach((f, i) => this.tone('sine', f, 0, 0.2, 0.22, i * 0.06)); break;
@@ -1393,15 +1395,17 @@ const GRAVE = {
     pistol: { key: 'grave_gun', name: '手槍', ammo: 5, reload: 0.6, gap: 0.16, radius: 0, sfx: 'pistol', lenW: 0.42, lenH: 0.24, muzzle: 0.5, shift: 0, barrel: 0.3, below: 0.46 },
     shotgun: { key: 'grave_shotgun', name: '散彈槍', ammo: 2, reload: 1.6, gap: 0.4, radius: 0.2, sfx: 'shotgun', lenW: 0.6, lenH: 0.34, muzzle: 0.5, shift: 0, barrel: 0.3, below: 0.4 },
     // 噴火槍：中咗變燒焦圖，同散彈槍一樣升一層
+    // 電鋸：範圍內全部鋸開兩邊，同散彈槍、噴火槍一樣只升一層
+    saw: { key: 'grave_saw', name: '電鋸', ammo: 4, reload: 1.2, gap: 0.3, radius: 0.15, saw: true, sfx: 'saw', lenW: 0.62, lenH: 0.36, muzzle: 0.5, shift: 0, barrel: -0.23, below: 0.42 },
     flame: { key: 'grave_flame_idle', fireKey: 'grave_flame', name: '噴火槍', ammo: 4, reload: 1, gap: 0.35, radius: 0.13, burn: true, sfx: 'flame', lenW: 0.7, lenH: 0.4, muzzle: 0.08, shift: 0.12, barrel: 0.12, below: 0.56 },
   },
-  order: ['pistol', 'shotgun', 'flame'],
+  order: ['pistol', 'shotgun', 'flame', 'saw'],
   energy: 5, grenades: 3, nadeTime: 0.6,
   hitScore: 20, killScore: 50,
   hopTime: 0.8, hops: 3, hopStep: 0.24,    // 中國殭屍：跳三下，每下行前
   humanWait: [5, 9], zomWait: [3.5, 6],    // 唔中槍都會自己變下一層（秒）
   step: 0.2, aggWait: 2.5, catchWait: 1.9, // 西方喪屍：第二層等一陣自動變第三層，每變一層行前一步，第三層等一陣就攻擊
-  lunge: 0.45, blastTime: 0.45, overTime: 2.4, voiceEvery: 10,
+  lunge: 0.45, blastTime: 0.45, halfTime: 0.8, overTime: 2.4, voiceEvery: 10,
   paceTime: 100, paceMax: 1.5, crowdEvery: 40, crowdMax: 3,   // 難度：每 100 秒快一倍，最快 2.5 倍；每 40 秒多一個人，最多多三個
   healEvery: [16, 26], healLife: 3,
   keys: { human: 'grave_stand', zom: 'grave_zom', cn: 'grave_cn', agg: 'grave_agg', catch: 'grave_catch' },
@@ -1437,7 +1441,7 @@ function graveSpawn(B, u) {
 function startGrave() {
   if (!game || game.phase !== 'punish' || game.paused) return;
   punishButtons(false); show('grave-hud');
-  const B = game.grave = { t: 0, chars: [], want: 3 + (Math.random() < 0.5 ? 1 : 0), spawnT: 0, weapon: 'pistol', ammo: { pistol: GRAVE.weapons.pistol.ammo, shotgun: GRAVE.weapons.shotgun.ammo, flame: GRAVE.weapons.flame.ammo }, cd: 0, reloadT: 0, recoil: 0, flashT: 0, aim: null, tracer: [], bits: [], blasts: [], energy: GRAVE.energy, grenades: GRAVE.grenades, nade: null, boomT: 0, heal: null, healT: rand(...GRAVE.healEvery), score: 0, kills: 0, hitN: 0, overT: 0, bellT: 1.5, biteT: 0 };
+  const B = game.grave = { t: 0, chars: [], want: 3 + (Math.random() < 0.5 ? 1 : 0), spawnT: 0, weapon: 'pistol', ammo: { pistol: GRAVE.weapons.pistol.ammo, shotgun: GRAVE.weapons.shotgun.ammo, flame: GRAVE.weapons.flame.ammo, saw: GRAVE.weapons.saw.ammo }, cd: 0, reloadT: 0, recoil: 0, flashT: 0, aim: null, tracer: [], bits: [], blasts: [], halves: [], energy: GRAVE.energy, grenades: GRAVE.grenades, nade: null, boomT: 0, heal: null, healT: rand(...GRAVE.healEvery), score: 0, kills: 0, hitN: 0, overT: 0, bellT: 1.5, biteT: 0 };
   game.phase = 'grave';
   graveSpawn(B, 0.5);
   while (B.chars.length < B.want) graveSpawn(B);
@@ -1492,16 +1496,47 @@ function graveHit(B, c, L, advance = false) {
   const b = graveCharBox(c, L);
   graveBits(B, b.x, b.fy - b.dh * 0.6, 12, ['#8a0f14', '#c01a22', '#5a0a0d']);
   c.flash = 0.15;
-  // 每中十槍先播一次語音
-  if (++B.hitN % GRAVE.voiceEvery === 0) {
-    const said = Sound.graveVoice();
-    if (said) B.bubble = { text: said, x: b.x, y: b.fy - b.dh, t: 1.4 };
-  }
+  graveCountHit(B, b);
   if (c.kind === 'cn' || c.kind === 'catch' || (c.kind === 'agg' && !advance)) { graveKill(B, c); return; }
   B.score += GRAVE.hitScore;
   floatText(`+${GRAVE.hitScore}`, b.x, b.fy - b.dh, '#ffd45c', 0.9);
   Sound.sfx('growl');
   graveAdvance(c);
+}
+
+// 每中十槍先播一次語音
+function graveCountHit(B, b) {
+  if (++B.hitN % GRAVE.voiceEvery !== 0) return;
+  const said = Sound.graveVoice();
+  if (said) B.bubble = { text: said, x: b.x, y: b.fy - b.dh, t: 1.4 };
+}
+
+// 電鋸：將而家個樣左右鋸開、兩邊分開跌走；同散彈槍、噴火槍一樣只升一層，新一層喺原位現身。冇下一層先死
+function graveSaw(B, c, L) {
+  const b = graveCharBox(c, L), cy = b.fy - b.dh * 0.55;
+  B.halves.push({ key: b.key, x: b.x, fy: b.fy, dh: b.dh, dw: b.dw, t: 0 });
+  graveBits(B, b.x, cy, 34, ['#8a0f14', '#c01a22', '#5a0a0d', '#e8e8e8']);
+  game.shake = Math.max(game.shake, 0.3);
+  graveHit(B, c, L, true);
+  c.flash = 0;
+  if (c.dead >= 0) c.dead = 9;   // 死咗：原本個人即刻唔畫，淨係半身
+  else c.rise = 0;               // 未死：新一層由透明現身
+}
+
+// 半身圖：切口塗血，只會塗喺身體上，唔會出界。每個半身畫一次就留用
+function graveHalf(m, side) {
+  const slot = side < 0 ? 'left' : 'right';
+  if (m[slot]) return m[slot];
+  const im = IMG[m.key], c = document.createElement('canvas'), w = Math.ceil(im.width / 2);
+  c.width = w; c.height = im.height;
+  const x = c.getContext('2d');
+  x.drawImage(im, side < 0 ? 0 : -(im.width - w), 0);
+  x.globalCompositeOperation = 'source-atop';
+  const g = x.createLinearGradient(side < 0 ? w : 0, 0, side < 0 ? w * 0.9 : w * 0.1, 0);
+  g.addColorStop(0, 'rgba(122,10,16,.95)'); g.addColorStop(0.5, 'rgba(176,16,24,.6)'); g.addColorStop(1, 'rgba(176,16,24,0)');
+  x.fillStyle = g; x.fillRect(0, 0, w, im.height);
+  m[slot] = c;
+  return c;
 }
 
 // 變下一層：中槍同時間到都行呢度
@@ -1523,11 +1558,11 @@ function graveFire(x, y) {
   const B = game.grave, w = GRAVE.weapons[B.weapon];
   B.aim = { x, y };
   if (B.reloadT > 0 || B.cd > 0 || B.ammo[B.weapon] <= 0) { if (B.reloadT > 0) Sound.sfx('empty'); return; }
-  B.ammo[B.weapon]--; B.cd = w.gap; B.recoil = 1; B.flashT = w.burn ? 0.3 : 0.07;
+  B.ammo[B.weapon]--; B.cd = w.gap; B.recoil = 1; B.flashT = w.burn || w.saw ? 0.3 : 0.07;
   Sound.sfx(w.sfx);
   const L = graveLayout(), alive = B.chars.filter((c) => c.dead < 0 && c.rise >= 0.3);
   if (w.radius) {
-    // 散彈槍：範圍內全部爆炸。噴火槍：範圍內全部燒焦。兩支都係打中升一層
+    // 散彈槍：範圍內全部爆炸。噴火槍：範圍內全部燒焦。電鋸：範圍內全部鋸開。三件都係打中升一層
     const R = U * w.radius;
     B.tracer.push({ x, y, r: R, t: 0 });
     if (w.burn) graveBits(B, x, y, 24, ['#ffb030', '#ff6a20', '#ffe9a8']);
@@ -1535,6 +1570,7 @@ function graveFire(x, y) {
       const b = graveCharBox(c, L), cy = b.fy - b.dh * 0.55;
       const dx = Math.max(0, Math.abs(x - b.x) - b.dw * 0.4), dy = Math.max(0, Math.abs(y - cy) - b.dh * 0.45);
       if (dx * dx + dy * dy > R * R) continue;
+      if (w.saw) { graveSaw(B, c, L); continue; }
       // 噴中未燒焦嘅人：先變燒焦人，呢下唔升層；再中先變喪屍
       if (w.burn && c.kind === 'human' && !c.burnt) { c.burnt = true; continue; }
       if (w.burn) c.burnt = true;
@@ -1545,7 +1581,7 @@ function graveFire(x, y) {
       }
       graveHit(B, c, L, true);
     }
-    if (!w.burn && B.blasts.some((m) => m.t === 0)) { Sound.sfx('blast'); game.shake = Math.max(game.shake, 0.35); }
+    if (!w.burn && !w.saw && B.blasts.some((m) => m.t === 0)) { Sound.sfx('blast'); game.shake = Math.max(game.shake, 0.35); }
   } else {
     // 手槍：打最前嗰個
     B.tracer.push({ x, y, r: U * 0.03, t: 0 });
@@ -1659,6 +1695,7 @@ function updateGrave(dt) {
 
   B.tracer = B.tracer.filter((m) => (m.t += dt) < 0.2);
   B.blasts = B.blasts.filter((m) => (m.t += dt) < GRAVE.blastTime);
+  B.halves = B.halves.filter((m) => (m.t += dt) < GRAVE.halfTime);
   B.bits = B.bits.filter((b) => { b.t += dt; b.vy += 800 * dt; b.x += b.vx * dt; b.y += b.vy * dt; return b.t < b.life; });
   graveButtons();
 }
@@ -1672,7 +1709,8 @@ function drawGraveGun(B, L) {
   const ax = B.aim ? B.aim.x : gx, ay = B.aim ? Math.min(B.aim.y, gy - 10) : gy - 100;
   const ang = Math.atan2(ay - gy, ax - gx), kick = B.recoil * len * 0.1;
   ctx.save(); ctx.translate(gx - Math.cos(ang) * kick, gy - Math.sin(ang) * kick);
-  if (firing && !w.burn) {
+  if (w.saw && firing) ctx.translate(rand(-3, 3), rand(-3, 3));   // 電鋸開動時震
+  if (firing && !w.burn && !w.saw) {
     const mz = len * (w.muzzle + 0.06), r = U * (B.weapon === 'pistol' ? 0.06 : 0.1);
     const g = ctx.createRadialGradient(Math.cos(ang) * mz, Math.sin(ang) * mz, 0, Math.cos(ang) * mz, Math.sin(ang) * mz, r);
     g.addColorStop(0, 'rgba(255,250,210,1)'); g.addColorStop(0.5, 'rgba(255,170,50,.8)'); g.addColorStop(1, 'rgba(255,90,0,0)');
@@ -1710,6 +1748,21 @@ function drawGrave() {
   if (B.bubble) drawBubble(B.bubble.text, B.bubble.x, B.bubble.y, '#6b5bb5');
 
   for (const b of B.bits) { ctx.save(); ctx.fillStyle = b.c; ctx.globalAlpha = 1 - b.t / b.life; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+
+  // 電鋸：半身各向左右分開、傾側，切口有血
+  for (const m of B.halves) {
+    const im = IMG[m.key], k = m.t / GRAVE.halfTime;
+    if (!im) continue;
+    for (const side of [-1, 1]) {
+      ctx.save();
+      ctx.translate(m.x + side * m.dw * (0.04 + 0.55 * k), m.fy);
+      ctx.rotate(side * k * 0.75);
+      ctx.globalAlpha = Math.min(1, 2.2 * (1 - k));
+      const hw = m.dw / 2;
+      ctx.drawImage(graveHalf(m, side), side < 0 ? -hw : 0, -m.dh, hw, m.dh);
+      ctx.restore();
+    }
+  }
 
   // 散彈槍爆炸：尖角火球，啱啱中嗰下最大最實，之後淡出
   for (const m of B.blasts) {
