@@ -1403,7 +1403,7 @@ const GRAVE = {
   step: 0.2, aggWait: 2.5, catchWait: 1.9, // 西方喪屍：第二層等一陣自動變第三層，每變一層行前一步，第三層等一陣就攻擊
   lunge: 0.45, blastTime: 0.45, overTime: 2.4, voiceEvery: 3,
   paceTime: 100, paceMax: 1.5, crowdEvery: 40, crowdMax: 3,   // 難度：每 100 秒快一倍，最快 2.5 倍；每 40 秒多一個人，最多多三個
-  healEvery: [10, 18], healLife: 5,
+  healEvery: [16, 26], healLife: 3,
   keys: { human: 'grave_stand', zom: 'grave_zom', cn: 'grave_cn', agg: 'grave_agg', catch: 'grave_catch' },
   burnKeys: { human: 'grave_stand_burn', zom: 'grave_zom_burn', cn: 'grave_cn_burn', agg: 'grave_agg_burn', catch: 'grave_catch_burn' },
 };
