@@ -8,7 +8,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>快打袁枝</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -79,9 +79,11 @@
 <!-- 懲罰：墳墓（右邊，喺爆樽下面） -->
 <button id="btn-grave" class="hidden">🪦 墳墓</button>
 <div id="grave-hud" class="hidden">
-  <div class="grave-bottom">
-    <button id="btn-grave-nade">💣 手榴彈 ×3</button>
+  <div class="grave-left">
     <button id="btn-grave-swap">換武器</button>
+    <button id="btn-grave-nade">💣 手榴彈 ×3</button>
+  </div>
+  <div class="grave-bottom">
     <button id="btn-grave-back">返回</button>
   </div>
 </div>
@@ -175,6 +177,6 @@
   </div>
 </div>
 
-<script src="game.js?v=66"></script>
+<script src="game.js?v=67"></script>
 </body>
 </html>

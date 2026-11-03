@@ -1768,7 +1768,9 @@ function drawGrave() {
   // 武器同子彈
   if (gun) {
     const w = GRAVE.weapons[B.weapon], left = B.ammo[B.weapon], txt = B.reloadT > 0 ? '裝彈中…' : `${w.name} ${left}/${w.ammo}`;
-    const tx = W * 0.2, ty = L.hudTop - fs * 1.1;
+    // 喺左下角兩粒掣上面；Game Over 時掣收起就留返原位
+    const lr = document.querySelector('.grave-left').getBoundingClientRect();
+    const tx = lr.height ? lr.left + lr.width / 2 : W * 0.2, ty = lr.height ? lr.top - fs * 0.9 : L.hudTop - fs * 1.1;
     ctx.lineWidth = fs * 0.24; ctx.strokeStyle = '#111'; ctx.strokeText(txt, tx, ty);
     ctx.fillStyle = B.reloadT > 0 ? '#ff9a5a' : '#ffe9a8'; ctx.fillText(txt, tx, ty);
   }

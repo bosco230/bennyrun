@@ -154,6 +154,10 @@ html, body {
 #grave-hud button { pointer-events: auto; cursor: pointer; font-family: inherit; font-weight: 900; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
 #grave-hud button:disabled { opacity: .5; }
 .grave-bottom { display: flex; gap: 8px; justify-content: center; align-self: center; }
+.grave-left {
+  position: fixed; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+}
 #btn-grave-nade, #btn-grave-swap, #btn-grave-back {
   border: 3px solid var(--blue); background: rgba(255,255,255,.94); color: var(--ink);
   font-size: 15px; padding: 8px 14px; border-radius: 999px; white-space: nowrap;
