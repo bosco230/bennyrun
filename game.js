@@ -1401,7 +1401,7 @@ const GRAVE = {
   hopTime: 0.8, hops: 3, hopStep: 0.24,    // 中國殭屍：跳三下，每下行前
   humanWait: [5, 9], zomWait: [3.5, 6],    // 唔中槍都會自己變下一層（秒）
   step: 0.2, aggWait: 2.5, catchWait: 1.9, // 西方喪屍：第二層等一陣自動變第三層，每變一層行前一步，第三層等一陣就攻擊
-  lunge: 0.45, blastTime: 0.45, overTime: 2.4, voiceEvery: 3,
+  lunge: 0.45, blastTime: 0.45, overTime: 2.4, voiceEvery: 10,
   paceTime: 100, paceMax: 1.5, crowdEvery: 40, crowdMax: 3,   // 難度：每 100 秒快一倍，最快 2.5 倍；每 40 秒多一個人，最多多三個
   healEvery: [16, 26], healLife: 3,
   keys: { human: 'grave_stand', zom: 'grave_zom', cn: 'grave_cn', agg: 'grave_agg', catch: 'grave_catch' },
@@ -1414,6 +1414,7 @@ const GRAVE_VOICES = [
   { src: 'assets/grave/grave_v3.m4a', text: '師傅，今次真係大鑊啦' },
   { src: 'assets/grave/grave_v4.m4a', text: '天地無極，乾坤借法' },
   { src: 'assets/grave/grave_v5.m4a', text: '死啦死啦，我俾佢咬中' },
+  { src: 'assets/grave/grave_v6.m4a', text: '急急如律令' },
 ];
 
 const gravePace = (B) => 1 + Math.min(GRAVE.paceMax, B.t / GRAVE.paceTime);
@@ -1491,7 +1492,7 @@ function graveHit(B, c, L, advance = false) {
   const b = graveCharBox(c, L);
   graveBits(B, b.x, b.fy - b.dh * 0.6, 12, ['#8a0f14', '#c01a22', '#5a0a0d']);
   c.flash = 0.15;
-  // 每中三槍先播一次語音
+  // 每中十槍先播一次語音
   if (++B.hitN % GRAVE.voiceEvery === 0) {
     const said = Sound.graveVoice();
     if (said) B.bubble = { text: said, x: b.x, y: b.fy - b.dh, t: 1.4 };
