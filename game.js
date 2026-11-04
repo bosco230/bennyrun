@@ -99,6 +99,7 @@ const IMG_SRC = {
   grave_flame: 'assets/grave/flame.png',
   grave_flame_idle: 'assets/grave/flame_idle.png',
   grave_saw: 'assets/grave/saw.png?v=2',
+  grave_flash: 'assets/grave/flash.png',
   grave_gun: 'assets/grave/gun.png?v=2',
   grave_shotgun: 'assets/grave/shotgun.png',
   grave_grenade: 'assets/grave/grenade.png',
@@ -614,6 +615,7 @@ const Sound = {
       case 'boom': this.noise(0.9, 1, 260, 0, 0.5); this.tone('sine', 100, 28, 0.8, 0.8); break;
       case 'bite': this.tone('sawtooth', 170, 60, 0.3, 0.32); this.noise(0.2, 0.5, 700, 0, 1); break;
       case 'growl': this.tone('sawtooth', 95, 55, 0.35, 0.24); this.tone('sawtooth', 102, 60, 0.3, 0.18, 0.02); break;
+      case 'flash': this.tone('square', 1500, 900, 0.04, 0.12); this.tone('sine', 700, 1500, 0.28, 0.14, 0.04); break;
       case 'saw': this.tone('sawtooth', 95, 140, 0.32, 0.26); this.tone('sawtooth', 190, 280, 0.32, 0.12); this.noise(0.32, 0.4, 2400, 0, 1.2); break;
       case 'blast': this.noise(0.45, 0.85, 420, 0, 0.6); this.tone('sine', 130, 38, 0.42, 0.55); break;
       case 'flame': this.noise(0.45, 0.6, 620, 0, 0.5); this.noise(0.3, 0.25, 2200, 0, 0.6); break;
@@ -1400,6 +1402,7 @@ const GRAVE = {
     flame: { key: 'grave_flame_idle', fireKey: 'grave_flame', name: '噴火槍', ammo: 4, reload: 1, gap: 0.35, radius: 0.13, burn: true, sfx: 'flame', lenW: 0.7, lenH: 0.4, muzzle: 0.08, shift: 0.12, barrel: 0.12, below: 0.56 },
   },
   order: ['pistol', 'shotgun', 'flame', 'saw'],
+  stunTime: 3, flashes: 3,   // 電筒：全場定住幾秒，每次入場用得幾次
   energy: 5, grenades: 3, nadeTime: 0.6,
   hitScore: 20, killScore: 50,
   hopTime: 0.8, hops: 3, hopStep: 0.24,    // 中國殭屍：跳三下，每下行前
@@ -1441,7 +1444,7 @@ function graveSpawn(B, u) {
 function startGrave() {
   if (!game || game.phase !== 'punish' || game.paused) return;
   punishButtons(false); show('grave-hud');
-  const B = game.grave = { t: 0, chars: [], want: 3 + (Math.random() < 0.5 ? 1 : 0), spawnT: 0, weapon: 'pistol', ammo: { pistol: GRAVE.weapons.pistol.ammo, shotgun: GRAVE.weapons.shotgun.ammo, flame: GRAVE.weapons.flame.ammo, saw: GRAVE.weapons.saw.ammo }, cd: 0, reloadT: 0, recoil: 0, flashT: 0, aim: null, tracer: [], bits: [], blasts: [], halves: [], energy: GRAVE.energy, grenades: GRAVE.grenades, nade: null, boomT: 0, heal: null, healT: rand(...GRAVE.healEvery), score: 0, kills: 0, hitN: 0, overT: 0, bellT: 1.5, biteT: 0 };
+  const B = game.grave = { t: 0, chars: [], want: 3 + (Math.random() < 0.5 ? 1 : 0), spawnT: 0, weapon: 'pistol', ammo: { pistol: GRAVE.weapons.pistol.ammo, shotgun: GRAVE.weapons.shotgun.ammo, flame: GRAVE.weapons.flame.ammo, saw: GRAVE.weapons.saw.ammo }, flashes: GRAVE.flashes, freezeT: 0, cd: 0, reloadT: 0, recoil: 0, flashT: 0, aim: null, tracer: [], bits: [], blasts: [], halves: [], energy: GRAVE.energy, grenades: GRAVE.grenades, nade: null, boomT: 0, heal: null, healT: rand(...GRAVE.healEvery), score: 0, kills: 0, hitN: 0, overT: 0, bellT: 1.5, biteT: 0 };
   game.phase = 'grave';
   graveSpawn(B, 0.5);
   while (B.chars.length < B.want) graveSpawn(B);
@@ -1464,6 +1467,9 @@ function graveButtons() {
   const nade = `💣 手榴彈 ×${B.grenades}`;
   if ($('btn-grave-nade').textContent !== nade) $('btn-grave-nade').textContent = nade;
   $('btn-grave-nade').disabled = B.grenades <= 0 || !!B.nade;
+  const light = `🔦 電筒 ×${B.flashes}`;
+  if ($('btn-grave-flash').textContent !== light) $('btn-grave-flash').textContent = light;
+  $('btn-grave-flash').disabled = B.flashes <= 0 || B.freezeT > 0;
 }
 
 // 冇子彈就自動裝彈：手槍快、散彈槍慢
@@ -1606,6 +1612,16 @@ function onGraveTap(x, y) {
   graveFire(x, y);
 }
 
+// 電筒：畫面上全部角色定住幾秒，唔算中槍
+function graveFlash() {
+  const B = game && game.grave;
+  if (!B || B.overT > 0 || B.flashes <= 0 || B.freezeT > 0) return;
+  B.flashes--; B.freezeT = GRAVE.stunTime;
+  game.flash = { t: 0.2, color: 'rgba(255,240,130,.55)' };
+  floatText('全部定住！', W / 2, H * 0.3, '#ffe36b', 1.3);
+  Sound.sfx('flash'); graveButtons();
+}
+
 function graveSwap() {
   const B = game && game.grave;
   if (!B) return;
@@ -1633,6 +1649,7 @@ function updateGrave(dt) {
     if ((B.overT -= dt) <= 0) endGrave();
     return;
   }
+  B.freezeT = Math.max(0, B.freezeT - dt);   // 真實時間，唔跟遊戲加速
   B.t += dt; B.cd = Math.max(0, B.cd - dt); B.recoil = Math.max(0, B.recoil - dt * 6); B.flashT = Math.max(0, B.flashT - dt); B.boomT = Math.max(0, B.boomT - dt); B.biteT = Math.max(0, B.biteT - dt);
   if (B.bubble && (B.bubble.t -= dt) <= 0) B.bubble = null;
   if ((B.bellT -= dt) <= 0) { Sound.graveBell(); B.bellT = rand(2.2, 5); }
@@ -1659,6 +1676,7 @@ function updateGrave(dt) {
     if (c.dead >= 0) { c.dead += dt; continue; }
     c.rise = Math.min(1, c.rise + dt * 2.5);
     c.z += (c.zTo - c.z) * Math.min(1, gdt * 6);
+    if (B.freezeT > 0) continue;   // 電筒定住：唔行、唔跳、唔變身、唔攻擊
     if (c.lungeT >= 0) {
       c.lungeT += gdt;
       if (c.lungeT >= GRAVE.lunge) {
@@ -1691,7 +1709,9 @@ function updateGrave(dt) {
 
   // 死咗就補人：開頭維持三至四個，玩得耐場上人數會多，補人亦會快
   const alive = B.chars.filter((c) => c.dead < 0).length, target = B.want + graveCrowd(B);
-  if (alive < target) { if ((B.spawnT -= gdt) <= 0) { graveSpawn(B); B.spawnT = rand(0.5, 1.2); if (alive + 1 >= target) B.want = 3 + (Math.random() < 0.5 ? 1 : 0); } } else B.spawnT = 0.6;
+  if (B.freezeT > 0) {
+    // 定住期間唔補人
+  } else if (alive < target) { if ((B.spawnT -= gdt) <= 0) { graveSpawn(B); B.spawnT = rand(0.5, 1.2); if (alive + 1 >= target) B.want = 3 + (Math.random() < 0.5 ? 1 : 0); } } else B.spawnT = 0.6;
 
   B.tracer = B.tracer.filter((m) => (m.t += dt) < 0.2);
   B.blasts = B.blasts.filter((m) => (m.t += dt) < GRAVE.blastTime);
@@ -1716,7 +1736,7 @@ function drawGraveGun(B, L) {
     g.addColorStop(0, 'rgba(255,250,210,1)'); g.addColorStop(0.5, 'rgba(255,170,50,.8)'); g.addColorStop(1, 'rgba(255,90,0,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(Math.cos(ang) * mz, Math.sin(ang) * mz, r, 0, Math.PI * 2); ctx.fill();
   }
-  // 三支槍原圖槍口都向左；瞄右邊就鏡射，唔會反轉
+  // 所有武器原圖槍口都向左；瞄右邊就鏡射，唔會反轉
   const gh = len / aspectOf(im);
   if (ax > gx) { ctx.rotate(ang); ctx.scale(-1, 1); } else ctx.rotate(ang - Math.PI);
   ctx.drawImage(im, -len / 2 + w.shift * len, -gh / 2 + w.barrel * gh, len, gh);
@@ -1740,7 +1760,14 @@ function drawGrave() {
   // 由遠至近畫
   for (const c of B.chars.slice().sort((a, b) => a.z - b.z)) {
     if (c.dead >= 9) continue;
-    const b = graveCharBox(c, L), walking = c.lungeT < 0 && (c.kind === 'human' || c.kind === 'zom' || c.kind === 'agg');
+    const b = graveCharBox(c, L), stunned = B.freezeT > 0 && c.dead < 0, walking = !stunned && c.lungeT < 0 && (c.kind === 'human' || c.kind === 'zom' || c.kind === 'agg');
+    if (stunned) {
+      // 定住：身後一團黃光，就嚟郁先閃
+      const gy = b.fy - b.dh * 0.5, gr = b.dh * 0.62, on = B.freezeT > 0.8 || Math.sin(B.t * 22) > 0;
+      const g = ctx.createRadialGradient(b.x, gy, gr * 0.1, b.x, gy, gr);
+      g.addColorStop(0, `rgba(255,240,130,${on ? 0.75 : 0.25})`); g.addColorStop(1, 'rgba(255,220,60,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, gy, gr, 0, Math.PI * 2); ctx.fill();
+    }
     // 中槍閃一下；死咗就邊倒邊淡出
     const alpha = c.dead >= 0 ? Math.max(0, 1 - c.dead / 0.55) : (c.flash > 0 ? 0.45 : c.rise), rot = c.dead >= 0 ? c.dead * 1.6 : (walking ? Math.sin(c.sway) * 0.03 : 0);
     drawSprite(b.key, b.x, b.fy - (walking ? Math.abs(Math.sin(c.sway)) * L.h * 0.012 : 0), b.dh, { alpha, rot });
@@ -1803,6 +1830,19 @@ function drawGrave() {
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
   if (B.biteT > 0) { ctx.save(); ctx.strokeStyle = `rgba(190,0,10,${B.biteT * 2})`; ctx.lineWidth = U * 0.05; ctx.strokeRect(0, 0, W, H); ctx.restore(); }
+
+  // 電筒：撳完頭 0.7 秒，畫面底部出電筒，光柱向上射
+  const lit = GRAVE.stunTime - B.freezeT;
+  if (B.freezeT > 0 && lit < 0.7 && IMG.grave_flash) {
+    const im = IMG.grave_flash, fh = Math.min(H * 0.2, W * 0.42), fw = fh * aspectOf(im), a = 1 - lit / 0.7;
+    const fx = W * 0.76, top = L.hudTop - fh * 1.02, lens = fx - fw * 0.2;
+    const g = ctx.createLinearGradient(0, top, 0, 0);
+    g.addColorStop(0, `rgba(255,245,160,${0.75 * a})`); g.addColorStop(1, `rgba(255,235,110,${0.1 * a})`);
+    ctx.fillStyle = g; ctx.beginPath();
+    ctx.moveTo(lens - fw * 0.3, top + fh * 0.04); ctx.lineTo(lens - W * 0.45, 0); ctx.lineTo(lens + W * 0.45, 0); ctx.lineTo(lens + fw * 0.3, top + fh * 0.04);
+    ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.globalAlpha = Math.min(1, a * 2.5); ctx.drawImage(im, fx - fw / 2, top, fw, fh); ctx.restore();
+  }
 
   const gun = drawGraveGun(B, L);
 
@@ -3349,6 +3389,7 @@ $('btn-yum-serve').addEventListener('click', yumServe);
 $('btn-yum-spare').addEventListener('click', () => { if (game && game.phase === 'yum') endYum(); });
 $('btn-grave').addEventListener('click', afterImages(startGrave));
 $('btn-grave-nade').addEventListener('click', graveGrenade);
+$('btn-grave-flash').addEventListener('click', graveFlash);
 $('btn-grave-swap').addEventListener('click', graveSwap);
 $('btn-grave-back').addEventListener('click', () => { if (game && game.phase === 'grave') endGrave(); });
 $('btn-bottle').addEventListener('click', afterImages(startBottle));

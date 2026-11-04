@@ -158,11 +158,12 @@ html, body {
   position: fixed; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom));
   display: flex; flex-direction: column; align-items: stretch; gap: 8px;
 }
-#btn-grave-nade, #btn-grave-swap, #btn-grave-back {
+#btn-grave-flash, #btn-grave-nade, #btn-grave-swap, #btn-grave-back {
   border: 3px solid var(--blue); background: rgba(255,255,255,.94); color: var(--ink);
   font-size: 15px; padding: 8px 14px; border-radius: 999px; white-space: nowrap;
 }
 #btn-grave-nade { border-color: #6d7a2a; color: #4d5a14; }
+#btn-grave-flash { border-color: #d9a400; color: #7a5c00; }
 #btn-grave-swap { border-color: #4d4a6b; color: #2f2d45; }
 #btn-bottle {
   position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 102px);
