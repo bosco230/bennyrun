@@ -1409,7 +1409,7 @@ const GRAVE = {
   },
   order: ['pistol', 'shotgun', 'flame', 'saw'],
   boltEvery: [20, 35], boltLife: 0.5, stunTime: 3,   // 閃電：隨機出現（秒），全場定住幾秒
-  daoistEvery: [0.55, 1], daoistHand: [0.82, 0.27],   // 道長：幾耐出手一次（秒）、符喺圖入面嘅位置
+  daoistEvery: [0.7, 1.5], daoistHand: [0.82, 0.27],   // 道長：幾耐出手一次（秒）、符喺圖入面嘅位置
   energy: 5, grenades: 3, nadeTime: 0.6,
   hitScore: 20, killScore: 50,
   hopTime: 0.8, hops: 3, hopStep: 0.24,    // 中國殭屍：跳三下，每下行前
