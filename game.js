@@ -99,7 +99,7 @@ const IMG_SRC = {
   grave_flame: 'assets/grave/flame.png',
   grave_flame_idle: 'assets/grave/flame_idle.png',
   grave_saw: 'assets/grave/saw.png?v=2',
-  grave_flash: 'assets/grave/flash.png',
+  grave_daoist: 'assets/grave/daoist.webp',
   grave_gun: 'assets/grave/gun.png?v=2',
   grave_shotgun: 'assets/grave/shotgun.png',
   grave_grenade: 'assets/grave/grenade.png',
@@ -615,7 +615,7 @@ const Sound = {
       case 'boom': this.noise(0.9, 1, 260, 0, 0.5); this.tone('sine', 100, 28, 0.8, 0.8); break;
       case 'bite': this.tone('sawtooth', 170, 60, 0.3, 0.32); this.noise(0.2, 0.5, 700, 0, 1); break;
       case 'growl': this.tone('sawtooth', 95, 55, 0.35, 0.24); this.tone('sawtooth', 102, 60, 0.3, 0.18, 0.02); break;
-      case 'flash': this.tone('square', 1500, 900, 0.04, 0.12); this.tone('sine', 700, 1500, 0.28, 0.14, 0.04); break;
+      case 'thunder': this.noise(0.14, 0.7, 3000, 0, 0.7); this.noise(1.6, 0.8, 170, 0.1, 0.5); this.tone('sine', 75, 30, 1.4, 0.5, 0.1); break;
       case 'saw': this.tone('sawtooth', 95, 140, 0.32, 0.26); this.tone('sawtooth', 190, 280, 0.32, 0.12); this.noise(0.32, 0.4, 2400, 0, 1.2); break;
       case 'blast': this.noise(0.45, 0.85, 420, 0, 0.6); this.tone('sine', 130, 38, 0.42, 0.55); break;
       case 'flame': this.noise(0.45, 0.6, 620, 0, 0.5); this.noise(0.3, 0.25, 2200, 0, 0.6); break;
@@ -1402,7 +1402,8 @@ const GRAVE = {
     flame: { key: 'grave_flame_idle', fireKey: 'grave_flame', name: '噴火槍', ammo: 4, reload: 1, gap: 0.35, radius: 0.13, burn: true, sfx: 'flame', lenW: 0.7, lenH: 0.4, muzzle: 0.08, shift: 0.12, barrel: 0.12, below: 0.56 },
   },
   order: ['pistol', 'shotgun', 'flame', 'saw'],
-  stunTime: 3, flashes: 3,   // 電筒：全場定住幾秒，每次入場用得幾次
+  boltEvery: [20, 35], boltLife: 0.5, stunTime: 3,   // 閃電：隨機出現（秒），全場定住幾秒
+  daoistEvery: [1.1, 2], daoistHand: [0.82, 0.27],   // 道長：幾耐出手一次（秒）、符喺圖入面嘅位置
   energy: 5, grenades: 3, nadeTime: 0.6,
   hitScore: 20, killScore: 50,
   hopTime: 0.8, hops: 3, hopStep: 0.24,    // 中國殭屍：跳三下，每下行前
@@ -1444,7 +1445,7 @@ function graveSpawn(B, u) {
 function startGrave() {
   if (!game || game.phase !== 'punish' || game.paused) return;
   punishButtons(false); show('grave-hud');
-  const B = game.grave = { t: 0, chars: [], want: 3 + (Math.random() < 0.5 ? 1 : 0), spawnT: 0, weapon: 'pistol', ammo: { pistol: GRAVE.weapons.pistol.ammo, shotgun: GRAVE.weapons.shotgun.ammo, flame: GRAVE.weapons.flame.ammo, saw: GRAVE.weapons.saw.ammo }, flashes: GRAVE.flashes, freezeT: 0, cd: 0, reloadT: 0, recoil: 0, flashT: 0, aim: null, tracer: [], bits: [], blasts: [], halves: [], energy: GRAVE.energy, grenades: GRAVE.grenades, nade: null, boomT: 0, heal: null, healT: rand(...GRAVE.healEvery), score: 0, kills: 0, hitN: 0, overT: 0, bellT: 1.5, biteT: 0 };
+  const B = game.grave = { t: 0, chars: [], want: 3 + (Math.random() < 0.5 ? 1 : 0), spawnT: 0, weapon: 'pistol', ammo: { pistol: GRAVE.weapons.pistol.ammo, shotgun: GRAVE.weapons.shotgun.ammo, flame: GRAVE.weapons.flame.ammo, saw: GRAVE.weapons.saw.ammo }, boltT: rand(...GRAVE.boltEvery), bolts: [], freezeT: 0, daoist: false, daoistT: 0, npcShots: [], silent: false, cd: 0, reloadT: 0, recoil: 0, flashT: 0, aim: null, tracer: [], bits: [], blasts: [], halves: [], energy: GRAVE.energy, grenades: GRAVE.grenades, nade: null, boomT: 0, heal: null, healT: rand(...GRAVE.healEvery), score: 0, kills: 0, hitN: 0, overT: 0, bellT: 1.5, biteT: 0 };
   game.phase = 'grave';
   graveSpawn(B, 0.5);
   while (B.chars.length < B.want) graveSpawn(B);
@@ -1467,9 +1468,9 @@ function graveButtons() {
   const nade = `💣 手榴彈 ×${B.grenades}`;
   if ($('btn-grave-nade').textContent !== nade) $('btn-grave-nade').textContent = nade;
   $('btn-grave-nade').disabled = B.grenades <= 0 || !!B.nade;
-  const light = `🔦 電筒 ×${B.flashes}`;
-  if ($('btn-grave-flash').textContent !== light) $('btn-grave-flash').textContent = light;
-  $('btn-grave-flash').disabled = B.flashes <= 0 || B.freezeT > 0;
+  const daoist = `☯ 道長 ${B.daoist ? 'ON' : 'OFF'}`;
+  if ($('btn-grave-daoist').textContent !== daoist) $('btn-grave-daoist').textContent = daoist;
+  $('btn-grave-daoist').classList.toggle('on', B.daoist);
 }
 
 // 冇子彈就自動裝彈：手槍快、散彈槍慢
@@ -1491,7 +1492,9 @@ function graveBits(B, x, y, n, colors) {
 }
 
 function graveKill(B, c) {
-  c.dead = 0; c.lungeT = -1; B.kills++; B.score += GRAVE.killScore;
+  c.dead = 0; c.lungeT = -1;
+  if (B.silent) return;   // 道長打死嘅唔計分
+  B.kills++; B.score += GRAVE.killScore;
   const b = graveCharBox(c, graveLayout());
   floatText(`+${GRAVE.killScore}`, b.x, b.fy - b.dh, '#ffd45c', 1);
 }
@@ -1504,15 +1507,17 @@ function graveHit(B, c, L, advance = false) {
   c.flash = 0.15;
   graveCountHit(B, b);
   if (c.kind === 'cn' || c.kind === 'catch' || (c.kind === 'agg' && !advance)) { graveKill(B, c); return; }
-  B.score += GRAVE.hitScore;
-  floatText(`+${GRAVE.hitScore}`, b.x, b.fy - b.dh, '#ffd45c', 0.9);
+  if (!B.silent) {
+    B.score += GRAVE.hitScore;
+    floatText(`+${GRAVE.hitScore}`, b.x, b.fy - b.dh, '#ffd45c', 0.9);
+  }
   Sound.sfx('growl');
   graveAdvance(c);
 }
 
 // 每中十槍先播一次語音
 function graveCountHit(B, b) {
-  if (++B.hitN % GRAVE.voiceEvery !== 0) return;
+  if (B.silent || ++B.hitN % GRAVE.voiceEvery !== 0) return;
   const said = Sound.graveVoice();
   if (said) B.bubble = { text: said, x: b.x, y: b.fy - b.dh, t: 1.4 };
 }
@@ -1566,6 +1571,12 @@ function graveFire(x, y) {
   if (B.reloadT > 0 || B.cd > 0 || B.ammo[B.weapon] <= 0) { if (B.reloadT > 0) Sound.sfx('empty'); return; }
   B.ammo[B.weapon]--; B.cd = w.gap; B.recoil = 1; B.flashT = w.burn || w.saw ? 0.3 : 0.07;
   Sound.sfx(w.sfx);
+  graveStrike(B, w, x, y);
+  graveAutoReload(B);
+}
+
+// 武器打喺 (x, y) 嘅效果：玩家同道長共用
+function graveStrike(B, w, x, y) {
   const L = graveLayout(), alive = B.chars.filter((c) => c.dead < 0 && c.rise >= 0.3);
   if (w.radius) {
     // 散彈槍：範圍內全部爆炸。噴火槍：範圍內全部燒焦。電鋸：範圍內全部鋸開。三件都係打中升一層
@@ -1597,7 +1608,33 @@ function graveFire(x, y) {
     });
     if (hit) graveHit(B, hit, L);
   }
-  graveAutoReload(B);
+}
+
+// 道長（NPC）：開咗就由電腦控制，隨機揀目標同武器，唔限次數，唔使裝彈，打中唔計分
+function graveDaoistToggle() {
+  const B = game && game.grave;
+  if (!B || B.overT > 0) return;
+  B.daoist = !B.daoist; B.daoistT = 0.6; B.npcShots = [];
+  Sound.sfx('reload'); graveButtons();
+}
+
+// 道長張圖貼住右下角；返回圖片位置同隻手（符）嘅位置
+function graveDaoistBox() {
+  const im = IMG.grave_daoist, dw = Math.min(W * 0.52, H * 0.34), dh = im ? dw / aspectOf(im) : dw;
+  const x = W - dw, y = H - dh;
+  return { x, y, dw, dh, hx: x + dw * GRAVE.daoistHand[0], hy: y + dh * GRAVE.daoistHand[1] };
+}
+
+function graveDaoistAttack(B, L) {
+  const targets = B.chars.filter((c) => c.dead < 0 && c.rise >= 0.3);
+  if (!targets.length) return;
+  const w = GRAVE.weapons[pick(GRAVE.order)], b = graveCharBox(pick(targets), L), x = b.x, y = b.fy - b.dh * 0.5, d = graveDaoistBox();
+  B.npcShots.push({ x0: d.hx, y0: d.hy, x, y, t: 0, c: w.burn ? '#ff7a20' : w.saw ? '#ff4040' : '#ffe9a8' });
+  Sound.sfx(w.sfx);
+  floatText(w.name, d.hx, d.hy - U * 0.04, '#ffe36b', 0.8);
+  B.silent = true;
+  graveStrike(B, w, x, y);
+  B.silent = false;
 }
 
 function onGraveTap(x, y) {
@@ -1612,14 +1649,42 @@ function onGraveTap(x, y) {
   graveFire(x, y);
 }
 
-// 電筒：畫面上全部角色定住幾秒，唔算中槍
-function graveFlash() {
-  const B = game && game.grave;
-  if (!B || B.overT > 0 || B.flashes <= 0 || B.freezeT > 0) return;
-  B.flashes--; B.freezeT = GRAVE.stunTime;
-  game.flash = { t: 0.2, color: 'rgba(255,240,130,.55)' };
-  floatText('全部定住！', W / 2, H * 0.3, '#ffe36b', 1.3);
-  Sound.sfx('flash'); graveButtons();
+// 閃電：隨機位置、隨機形狀，由天頂劈落；座標用畫面比例，轉向都唔會走位
+function graveBoltPath(x, y, x1, y1, n) {
+  const pts = [{ x, y }];
+  for (let i = 1; i <= n; i++) {
+    const f = i / n;
+    pts.push({ x: x + (x1 - x) * f + (i < n ? rand(-0.045, 0.045) : 0), y: y + (y1 - y) * f });
+  }
+  return pts;
+}
+function graveLightning(B) {
+  for (let k = Math.random() < 0.25 ? 2 : 1; k > 0; k--) {
+    const x0 = rand(0.08, 0.92), pts = graveBoltPath(x0, 0, clamp(x0 + rand(-0.2, 0.2), 0.03, 0.97), rand(0.3, 0.46), 12), kids = [];
+    for (let i = 1 + Math.floor(rand(0, 3)); i > 0; i--) {
+      const p = pts[2 + Math.floor(rand(0, 7))];
+      kids.push(graveBoltPath(p.x, p.y, p.x + rand(-0.16, 0.16), p.y + rand(0.05, 0.13), 5));
+    }
+    B.bolts.push({ t: 0, pts, kids });
+  }
+  B.freezeT = GRAVE.stunTime;
+  game.flash = { t: 0.16, color: 'rgba(205,222,255,.5)' };
+  floatText('全部定住！', W / 2, H * 0.3, '#bcd6ff', 1.3);
+  Sound.sfx('thunder');
+}
+function drawGraveBolts(B) {
+  const line = (pts) => { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x * W, p.y * H) : ctx.moveTo(p.x * W, p.y * H))); ctx.stroke(); };
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const m of B.bolts) {
+    // 閃兩下先淡出
+    ctx.globalAlpha = m.t < 0.06 ? 1 : m.t < 0.12 ? 0.25 : m.t < 0.2 ? 1 : 1 - (m.t - 0.2) / (GRAVE.boltLife - 0.2);
+    for (const [color, wide] of [['rgba(130,175,255,.45)', 0.028], ['#fff', 0.008]]) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1.5, U * wide); line(m.pts);
+      ctx.lineWidth = Math.max(1, U * wide * 0.5); m.kids.forEach(line);
+    }
+  }
+  ctx.restore();
 }
 
 function graveSwap() {
@@ -1645,11 +1710,15 @@ function graveGameOver(B) {
 
 function updateGrave(dt) {
   const B = game.grave, L = graveLayout();
+  B.bolts = B.bolts.filter((m) => (m.t += dt) < GRAVE.boltLife);
   if (B.overT > 0) {
     if ((B.overT -= dt) <= 0) endGrave();
     return;
   }
   B.freezeT = Math.max(0, B.freezeT - dt);   // 真實時間，唔跟遊戲加速
+  if ((B.boltT -= dt) <= 0) { B.boltT = rand(...GRAVE.boltEvery); graveLightning(B); }
+  if (B.daoist && (B.daoistT -= dt) <= 0) { B.daoistT = rand(...GRAVE.daoistEvery); graveDaoistAttack(B, L); }
+  B.npcShots = B.npcShots.filter((m) => (m.t += dt) < 0.22);
   B.t += dt; B.cd = Math.max(0, B.cd - dt); B.recoil = Math.max(0, B.recoil - dt * 6); B.flashT = Math.max(0, B.flashT - dt); B.boomT = Math.max(0, B.boomT - dt); B.biteT = Math.max(0, B.biteT - dt);
   if (B.bubble && (B.bubble.t -= dt) <= 0) B.bubble = null;
   if ((B.bellT -= dt) <= 0) { Sound.graveBell(); B.bellT = rand(2.2, 5); }
@@ -1676,7 +1745,7 @@ function updateGrave(dt) {
     if (c.dead >= 0) { c.dead += dt; continue; }
     c.rise = Math.min(1, c.rise + dt * 2.5);
     c.z += (c.zTo - c.z) * Math.min(1, gdt * 6);
-    if (B.freezeT > 0) continue;   // 電筒定住：唔行、唔跳、唔變身、唔攻擊
+    if (B.freezeT > 0) continue;   // 閃電定住：唔行、唔跳、唔變身、唔攻擊
     if (c.lungeT >= 0) {
       c.lungeT += gdt;
       if (c.lungeT >= GRAVE.lunge) {
@@ -1757,15 +1826,17 @@ function drawGrave() {
     ctx.restore();
   }
 
+  drawGraveBolts(B);
+
   // 由遠至近畫
   for (const c of B.chars.slice().sort((a, b) => a.z - b.z)) {
     if (c.dead >= 9) continue;
     const b = graveCharBox(c, L), stunned = B.freezeT > 0 && c.dead < 0, walking = !stunned && c.lungeT < 0 && (c.kind === 'human' || c.kind === 'zom' || c.kind === 'agg');
     if (stunned) {
-      // 定住：身後一團黃光，就嚟郁先閃
+      // 定住：身後一團電光，就嚟郁先閃
       const gy = b.fy - b.dh * 0.5, gr = b.dh * 0.62, on = B.freezeT > 0.8 || Math.sin(B.t * 22) > 0;
       const g = ctx.createRadialGradient(b.x, gy, gr * 0.1, b.x, gy, gr);
-      g.addColorStop(0, `rgba(255,240,130,${on ? 0.75 : 0.25})`); g.addColorStop(1, 'rgba(255,220,60,0)');
+      g.addColorStop(0, `rgba(190,215,255,${on ? 0.75 : 0.25})`); g.addColorStop(1, 'rgba(130,175,255,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, gy, gr, 0, Math.PI * 2); ctx.fill();
     }
     // 中槍閃一下；死咗就邊倒邊淡出
@@ -1831,17 +1902,14 @@ function drawGrave() {
   }
   if (B.biteT > 0) { ctx.save(); ctx.strokeStyle = `rgba(190,0,10,${B.biteT * 2})`; ctx.lineWidth = U * 0.05; ctx.strokeRect(0, 0, W, H); ctx.restore(); }
 
-  // 電筒：撳完頭 0.7 秒，畫面底部出電筒，光柱向上射
-  const lit = GRAVE.stunTime - B.freezeT;
-  if (B.freezeT > 0 && lit < 0.7 && IMG.grave_flash) {
-    const im = IMG.grave_flash, fh = Math.min(H * 0.2, W * 0.42), fw = fh * aspectOf(im), a = 1 - lit / 0.7;
-    const fx = W * 0.76, top = L.hudTop - fh * 1.02, lens = fx - fw * 0.2;
-    const g = ctx.createLinearGradient(0, top, 0, 0);
-    g.addColorStop(0, `rgba(255,245,160,${0.75 * a})`); g.addColorStop(1, `rgba(255,235,110,${0.1 * a})`);
-    ctx.fillStyle = g; ctx.beginPath();
-    ctx.moveTo(lens - fw * 0.3, top + fh * 0.04); ctx.lineTo(lens - W * 0.45, 0); ctx.lineTo(lens + W * 0.45, 0); ctx.lineTo(lens + fw * 0.3, top + fh * 0.04);
-    ctx.closePath(); ctx.fill();
-    ctx.save(); ctx.globalAlpha = Math.min(1, a * 2.5); ctx.drawImage(im, fx - fw / 2, top, fw, fh); ctx.restore();
+  // 道長：開咗就喺右下角，出手時由符射一條光去目標
+  if (B.daoist && IMG.grave_daoist) {
+    const d = graveDaoistBox();
+    ctx.drawImage(IMG.grave_daoist, d.x, d.y, d.dw, d.dh);
+    for (const m of B.npcShots) {
+      ctx.save(); ctx.globalAlpha = 1 - m.t / 0.22; ctx.strokeStyle = m.c; ctx.lineWidth = Math.max(3, U * 0.012); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(m.x0, m.y0); ctx.lineTo(m.x, m.y); ctx.stroke(); ctx.restore();
+    }
   }
 
   const gun = drawGraveGun(B, L);
@@ -3389,7 +3457,7 @@ $('btn-yum-serve').addEventListener('click', yumServe);
 $('btn-yum-spare').addEventListener('click', () => { if (game && game.phase === 'yum') endYum(); });
 $('btn-grave').addEventListener('click', afterImages(startGrave));
 $('btn-grave-nade').addEventListener('click', graveGrenade);
-$('btn-grave-flash').addEventListener('click', graveFlash);
+$('btn-grave-daoist').addEventListener('click', graveDaoistToggle);
 $('btn-grave-swap').addEventListener('click', graveSwap);
 $('btn-grave-back').addEventListener('click', () => { if (game && game.phase === 'grave') endGrave(); });
 $('btn-bottle').addEventListener('click', afterImages(startBottle));
