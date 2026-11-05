@@ -8,6 +8,9 @@ assets/**/hf_*.png
 # 根目錄嘅原始錄音（遊戲用 assets/audio/voice/ 嗰份）
 /*.m4a
 
+# 設計文件（只留喺本機，唔公開）
+PRD.md
+
 # 系統檔
 .DS_Store
 Thumbs.db
