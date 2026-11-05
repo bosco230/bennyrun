@@ -96,6 +96,12 @@ const IMG_SRC = {
   grave_cn_burn: 'assets/grave/cn_burn.webp',
   grave_agg_burn: 'assets/grave/agg_burn.webp',
   grave_catch_burn: 'assets/grave/catch_burn.webp',
+  grave_v1: 'assets/grave/v1.webp',
+  grave_v2: 'assets/grave/v2.webp',
+  grave_v3: 'assets/grave/v3.webp',
+  grave_v1_burn: 'assets/grave/v1_burn.webp',
+  grave_v2_burn: 'assets/grave/v2_burn.webp',
+  grave_v3_burn: 'assets/grave/v3_burn.webp',
   grave_flame: 'assets/grave/flame.png',
   grave_flame_idle: 'assets/grave/flame_idle.png',
   grave_saw: 'assets/grave/saw.png?v=2',
@@ -1403,7 +1409,7 @@ const GRAVE = {
   },
   order: ['pistol', 'shotgun', 'flame', 'saw'],
   boltEvery: [20, 35], boltLife: 0.5, stunTime: 3,   // 閃電：隨機出現（秒），全場定住幾秒
-  daoistEvery: [1.1, 2], daoistHand: [0.82, 0.27],   // 道長：幾耐出手一次（秒）、符喺圖入面嘅位置
+  daoistEvery: [0.55, 1], daoistHand: [0.82, 0.27],   // 道長：幾耐出手一次（秒）、符喺圖入面嘅位置
   energy: 5, grenades: 3, nadeTime: 0.6,
   hitScore: 20, killScore: 50,
   hopTime: 0.8, hops: 3, hopStep: 0.24,    // 中國殭屍：跳三下，每下行前
@@ -1412,8 +1418,9 @@ const GRAVE = {
   lunge: 0.45, blastTime: 0.45, halfTime: 0.8, overTime: 2.4, voiceEvery: 10,
   paceTime: 100, paceMax: 1.5, crowdEvery: 40, crowdMax: 3,   // 難度：每 100 秒快一倍，最快 2.5 倍；每 40 秒多一個人，最多多三個
   healEvery: [16, 26], healLife: 3,
-  keys: { human: 'grave_stand', zom: 'grave_zom', cn: 'grave_cn', agg: 'grave_agg', catch: 'grave_catch' },
-  burnKeys: { human: 'grave_stand_burn', zom: 'grave_zom_burn', cn: 'grave_cn_burn', agg: 'grave_agg_burn', catch: 'grave_catch_burn' },
+  keys: { human: 'grave_stand', zom: 'grave_zom', cn: 'grave_cn', agg: 'grave_agg', catch: 'grave_catch', v1: 'grave_v1', v2: 'grave_v2', v3: 'grave_v3' },
+  burnKeys: { human: 'grave_stand_burn', zom: 'grave_zom_burn', cn: 'grave_cn_burn', agg: 'grave_agg_burn', catch: 'grave_catch_burn', v1: 'grave_v1_burn', v2: 'grave_v2_burn', v3: 'grave_v3_burn' },
+  vampChance: 0.3,   // 吸血鬼：補人時有幾大機會出。三層，中一下升一層，第三層先死
 };
 
 const GRAVE_VOICES = [
@@ -1437,7 +1444,8 @@ function graveLayout() {
 }
 
 function graveSpawn(B, u) {
-  B.chars.push({ u: u === undefined ? rand(0.12, 0.88) : u, z: rand(0, 0.25), zTo: 0, dir: Math.random() < 0.5 ? -1 : 1, kind: 'human', T: rand(...GRAVE.humanWait), hop: 0, hopT: 0, rise: 0, flash: 0, lungeT: -1, dead: -1, sway: rand(0, 6) });
+  const vamp = Math.random() < GRAVE.vampChance;
+  B.chars.push({ u: u === undefined ? rand(0.12, 0.88) : u, z: rand(0, 0.25), zTo: 0, dir: Math.random() < 0.5 ? -1 : 1, kind: vamp ? 'v1' : 'human', T: rand(...(vamp ? GRAVE.zomWait : GRAVE.humanWait)), hop: 0, hopT: 0, rise: 0, flash: 0, lungeT: -1, dead: -1, sway: rand(0, 6) });
   const c = B.chars[B.chars.length - 1]; c.zTo = c.z;
   return c;
 }
@@ -1481,8 +1489,9 @@ function graveAutoReload(B) {
 
 function graveCharBox(c, L) {
   const key = (c.burnt ? GRAVE.burnKeys : GRAVE.keys)[c.kind], grow = 0.78 + 0.5 * c.z, lunge = c.lungeT >= 0 ? 1 + 1.7 * Math.min(1, c.lungeT / GRAVE.lunge) : 1;
-  const dh = L.h * grow * lunge, dw = dh * aspect(key);
-  let fy = L.far + (L.near - L.far) * Math.min(1, c.z);
+  // 吸血鬼第三層係半身近鏡：放大，下半身出咗畫面，唔會見到切口
+  const close = c.kind === 'v3', dh = L.h * grow * (close ? 1.5 * (1 + 0.5 * Math.min(1, Math.max(0, c.lungeT) / GRAVE.lunge)) : lunge), dw = dh * aspect(key);
+  let fy = close ? H * 1.01 : L.far + (L.near - L.far) * Math.min(1, c.z);
   if (c.kind === 'cn' && c.hopT > 0) fy -= Math.sin(Math.PI * Math.min(1, c.hopT / GRAVE.hopTime)) * L.h * 0.22;
   return { key, x: c.u * W, fy, dh, dw };
 }
@@ -1506,7 +1515,7 @@ function graveHit(B, c, L, advance = false) {
   graveBits(B, b.x, b.fy - b.dh * 0.6, 12, ['#8a0f14', '#c01a22', '#5a0a0d']);
   c.flash = 0.15;
   graveCountHit(B, b);
-  if (c.kind === 'cn' || c.kind === 'catch' || (c.kind === 'agg' && !advance)) { graveKill(B, c); return; }
+  if (c.kind === 'cn' || c.kind === 'catch' || c.kind === 'v3' || (c.kind === 'agg' && !advance)) { graveKill(B, c); return; }
   if (!B.silent) {
     B.score += GRAVE.hitScore;
     floatText(`+${GRAVE.hitScore}`, b.x, b.fy - b.dh, '#ffd45c', 0.9);
@@ -1558,6 +1567,10 @@ function graveAdvance(c) {
     if (Math.random() < 0.5) { c.kind = 'cn'; c.hop = 0; c.hopT = 0.001; } else { c.kind = 'agg'; c.zTo += GRAVE.step; c.T = GRAVE.aggWait; }
   } else if (c.kind === 'agg') {
     graveToCatch(c);
+  } else if (c.kind === 'v1') {
+    c.kind = 'v2'; c.zTo += GRAVE.step; c.T = GRAVE.aggWait;
+  } else if (c.kind === 'v2') {
+    c.kind = 'v3'; c.zTo += GRAVE.step; c.T = GRAVE.catchWait;
   }
 }
 
@@ -1589,7 +1602,7 @@ function graveStrike(B, w, x, y) {
       if (dx * dx + dy * dy > R * R) continue;
       if (w.saw) { graveSaw(B, c, L); continue; }
       // 噴中未燒焦嘅人：先變燒焦人，呢下唔升層；再中先變喪屍
-      if (w.burn && c.kind === 'human' && !c.burnt) { c.burnt = true; continue; }
+      if (w.burn && (c.kind === 'human' || c.kind === 'v1') && !c.burnt) { c.burnt = true; continue; }
       if (w.burn) c.burnt = true;
       else {
         // 散彈槍：中嗰個爆炸
@@ -1765,12 +1778,12 @@ function updateGrave(dt) {
         c.hopT = 0.001; c.hop++; c.zTo += GRAVE.hopStep; Sound.sfx('miss');
         if (c.hop >= GRAVE.hops) { c.hopT = 0; c.lungeT = 0; Sound.sfx('growl'); }
       }
-    } else if (c.kind === 'catch') {
+    } else if (c.kind === 'catch' || c.kind === 'v3') {
       if ((c.T -= gdt) <= 0) { c.lungeT = 0; Sound.sfx('growl'); }
     } else {
       // 人同喪屍等夠時間會自己變下一層，唔開槍都有危險
       if ((c.T -= gdt) <= 0) { graveAdvance(c); Sound.sfx('growl'); continue; }
-      c.u += c.dir * speed * gdt * (c.kind === 'agg' ? 1.25 : 1);
+      c.u += c.dir * speed * gdt * (c.kind === 'agg' || c.kind === 'v2' ? 1.25 : 1);
       if (c.u <= 0.1) { c.u = 0.1; c.dir = 1; } else if (c.u >= 0.9) { c.u = 0.9; c.dir = -1; } else if (Math.random() < 0.2 * gdt) c.dir *= -1;
     }
   }
@@ -1831,7 +1844,7 @@ function drawGrave() {
   // 由遠至近畫
   for (const c of B.chars.slice().sort((a, b) => a.z - b.z)) {
     if (c.dead >= 9) continue;
-    const b = graveCharBox(c, L), stunned = B.freezeT > 0 && c.dead < 0, walking = !stunned && c.lungeT < 0 && (c.kind === 'human' || c.kind === 'zom' || c.kind === 'agg');
+    const b = graveCharBox(c, L), stunned = B.freezeT > 0 && c.dead < 0, walking = !stunned && c.lungeT < 0 && (c.kind === 'human' || c.kind === 'zom' || c.kind === 'agg' || c.kind === 'v1' || c.kind === 'v2');
     if (stunned) {
       // 定住：身後一團電光，就嚟郁先閃
       const gy = b.fy - b.dh * 0.5, gr = b.dh * 0.62, on = B.freezeT > 0.8 || Math.sin(B.t * 22) > 0;
